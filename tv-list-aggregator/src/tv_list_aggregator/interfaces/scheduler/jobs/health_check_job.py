@@ -1,12 +1,15 @@
-"""健康检查任务：连续失败阈值触发自动暂停。"""
+"""健康检查任务：使用 SourceHealthRepository 持久化 fail_streak。"""
 from __future__ import annotations
 
-from .....core.logging import get_logger
-from .....core.settings import get_settings
-from .....domain.models.source import SourceStatus
-from .....domain.ports.source_repository import SourceRepository
-from .....domain.services.health_check_service import HealthCheckService
-from .....domain.services.source_registry import SourceRegistry
+from ....core.logging import get_logger
+from ....core.settings import get_settings
+from ....domain.models.source import SourceStatus
+from ....domain.ports.source_repository import SourceRepository
+from ....domain.services.health_check_service import HealthCheckService
+from ....domain.services.source_registry import SourceRegistry
+from ....infrastructure.persistence.source_health_repository import (
+    SQLAlchemySourceHealthRepository,
+)
 
 log = get_logger(__name__)
 
@@ -14,21 +17,29 @@ log = get_logger(__name__)
 async def health_check_loop(
     svc: HealthCheckService,
     registry: SourceRegistry,
-    repo: SourceRepository,
+    source_repo: SourceRepository,
+    health_repo: SQLAlchemySourceHealthRepository,
 ) -> None:
+    """遍历活跃源执行健康检查，连续失败达到阈值时自动暂停。
+
+    修复 issue #1：fail_streak 通过 SourceHealthRepository 跨任务持久化。
+    """
     threshold = get_settings().health_check_fail_threshold
-    fail_streak: dict[str, int] = {}
     sources = await registry.active()
     for s in sources:
         h = await svc.check(s)
         if not h.is_alive:
-            fail_streak[s.id] = fail_streak.get(s.id, 0) + 1
+            streak = await health_repo.increment(s.id, message=h.message)
             log.warning(
-                "health.fail", source_id=s.id, streak=fail_streak[s.id], message=h.message
+                "health.fail",
+                source_id=s.id,
+                streak=streak,
+                threshold=threshold,
+                message=h.message,
             )
-            if fail_streak[s.id] >= threshold:
+            if streak >= threshold:
                 s.status = SourceStatus.PAUSED
-                await repo.update(s)
-                log.warning("source.auto_paused", source_id=s.id, streak=fail_streak[s.id])
+                await source_repo.update(s)
+                log.warning("source.auto_paused", source_id=s.id, streak=streak)
         else:
-            fail_streak.pop(s.id, None)
+            await health_repo.reset(s.id)

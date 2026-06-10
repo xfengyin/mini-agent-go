@@ -28,6 +28,8 @@ dependencies = [
   "apscheduler>=3.10",
   "python-jose[cryptography]>=3.3",
   "passlib[bcrypt]>=1.7",
+  "bcrypt<4.0",  # passlib 1.7 与 bcrypt 4.x 不兼容
+  "python-multipart>=0.0.9",
   "cryptography>=42",
   "selectolax>=0.3.21",
   "trafilatura>=1.6",

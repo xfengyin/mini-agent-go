@@ -14,6 +14,7 @@ class JobStatus(str, Enum):
     RUNNING = "running"
     SUCCESS = "success"
     FAILED = "failed"
+    PARTIAL_FAILURE = "partial_failure"
     RETRY = "retry"
 
 

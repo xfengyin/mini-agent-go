@@ -10,7 +10,7 @@ from jose import JWTError, jwt
 
 from ...core.settings import get_settings
 
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/token", auto_error=True)
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/token", auto_error=True)
 
 ROLE_ADMIN = "admin"
 ROLE_USER = "user"
@@ -25,7 +25,8 @@ def create_access_token(sub: str, role: str = ROLE_USER, ttl_min: int | None = N
         "role": role,
         "exp": datetime.now(tz=UTC) + timedelta(minutes=ttl),
     }
-    return jwt.encode(payload, s.secret_key, algorithm=s.jwt_algorithm)
+    # SecretStr.get_secret_value() 显式取值
+    return jwt.encode(payload, s.secret_key.get_secret_value(), algorithm=s.jwt_algorithm)
 
 
 def require_role(required: str):
@@ -34,10 +35,14 @@ def require_role(required: str):
     def _checker(token: Annotated[str, Depends(oauth2_scheme)]) -> dict:
         s = get_settings()
         try:
-            payload = jwt.decode(token, s.secret_key, algorithms=[s.jwt_algorithm])
+            payload = jwt.decode(
+                token, s.secret_key.get_secret_value(), algorithms=[s.jwt_algorithm]
+            )
         except JWTError as e:
             raise HTTPException(status.HTTP_401_UNAUTHORIZED, "invalid token") from e
-        if required not in (payload.get("role"), ROLE_ADMIN):
+        # admin 拥有所有权限；否则只允许 role == required
+        user_role = payload.get("role")
+        if user_role not in (required, ROLE_ADMIN):
             raise HTTPException(status.HTTP_403_FORBIDDEN, "insufficient role")
         return payload
 

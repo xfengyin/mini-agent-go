@@ -4,7 +4,7 @@ from __future__ import annotations
 from datetime import datetime
 from enum import Enum
 
-from pydantic import BaseModel, ConfigDict, Field, HttpUrl
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class SourceType(str, Enum):
@@ -33,7 +33,7 @@ class TVListSource(BaseModel):
     id: str
     name: str = Field(min_length=1, max_length=255)
     type: SourceType
-    url: HttpUrl | None = None
+    url: str | None = None  # 接受任意字符串；具体 URL 校验由 fetcher 层负责
     config: dict = Field(default_factory=dict)
     headers: dict[str, str] = Field(default_factory=dict)
     cron: str = "*/15 * * * *"

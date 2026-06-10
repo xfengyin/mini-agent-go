@@ -63,3 +63,27 @@ class JobRow(Base):
     items_saved: Mapped[int] = mapped_column(Integer, default=0)
     error: Mapped[str | None] = mapped_column(Text, nullable=True)
     trace_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+
+
+class UserRow(Base):
+    """用户表（密码以 bcrypt 哈希存储）。"""
+
+    __tablename__ = "users"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    username: Mapped[str] = mapped_column(String(64), unique=True, index=True)
+    password_hash: Mapped[str] = mapped_column(String(255))
+    role: Mapped[str] = mapped_column(String(16), default="user")
+    created_at: Mapped[datetime] = mapped_column(DateTime)
+    disabled: Mapped[bool] = mapped_column(default=False)
+
+
+class SourceHealthRow(Base):
+    """源健康状态（连续失败计数跨任务持久化）。"""
+
+    __tablename__ = "source_health"
+
+    source_id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    fail_streak: Mapped[int] = mapped_column(Integer, default=0)
+    last_check_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    last_message: Mapped[str | None] = mapped_column(Text, nullable=True)

@@ -5,12 +5,10 @@ import uuid
 from datetime import UTC, datetime
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from ....domain.models.source import SourceStatus, TVListSource
-from ....infrastructure.persistence.source_repository_impl import (
-    SQLAlchemySourceRepository,
-)
-from ..deps import get_source_repo
+from ..deps import get_session, get_source_repo
 from ..schemas.source import SourceCreate, SourceOut
 from ..security import ROLE_ADMIN, require_role
 
@@ -25,23 +23,27 @@ router = APIRouter(prefix="/sources", tags=["sources"])
 )
 async def create_source(
     payload: SourceCreate,
-    repo: SQLAlchemySourceRepository = Depends(get_source_repo),
+    repo=Depends(get_source_repo),
+    session: AsyncSession = Depends(get_session),
 ):
     now = datetime.now(tz=UTC)
+    data = payload.model_dump(exclude_none=False)
+    src_id = data.pop("id") or str(uuid.uuid4())
     src = TVListSource(
-        id=str(uuid.uuid4()),
-        **payload.model_dump(),
+        id=src_id,
+        **data,
         status=SourceStatus.ACTIVE,
         created_at=now,
         updated_at=now,
     )
     await repo.add(src)
+    await session.commit()
     return src
 
 
 @router.get("", response_model=list[SourceOut])
 async def list_sources(
-    repo: SQLAlchemySourceRepository = Depends(get_source_repo),
+    repo=Depends(get_source_repo),
 ):
     return await repo.list()
 
@@ -49,7 +51,7 @@ async def list_sources(
 @router.get("/{source_id}", response_model=SourceOut)
 async def get_source(
     source_id: str,
-    repo: SQLAlchemySourceRepository = Depends(get_source_repo),
+    repo=Depends(get_source_repo),
 ):
     s = await repo.get(source_id)
     if not s:
@@ -64,9 +66,11 @@ async def get_source(
 )
 async def delete_source(
     source_id: str,
-    repo: SQLAlchemySourceRepository = Depends(get_source_repo),
+    repo=Depends(get_source_repo),
+    session: AsyncSession = Depends(get_session),
 ):
     await repo.delete(source_id)
+    await session.commit()
     return
 
 
@@ -76,13 +80,15 @@ async def delete_source(
 )
 async def enable_source(
     source_id: str,
-    repo: SQLAlchemySourceRepository = Depends(get_source_repo),
+    repo=Depends(get_source_repo),
+    session: AsyncSession = Depends(get_session),
 ):
     s = await repo.get(source_id)
     if not s:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "source not found")
     s.status = SourceStatus.ACTIVE
     await repo.update(s)
+    await session.commit()
     return {"ok": True}
 
 
@@ -92,11 +98,13 @@ async def enable_source(
 )
 async def disable_source(
     source_id: str,
-    repo: SQLAlchemySourceRepository = Depends(get_source_repo),
+    repo=Depends(get_source_repo),
+    session: AsyncSession = Depends(get_session),
 ):
     s = await repo.get(source_id)
     if not s:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "source not found")
     s.status = SourceStatus.DISABLED
     await repo.update(s)
+    await session.commit()
     return {"ok": True}

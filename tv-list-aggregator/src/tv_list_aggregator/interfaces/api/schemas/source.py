@@ -9,9 +9,10 @@ from ....domain.models.source import SourceStatus, SourceType
 
 
 class SourceCreate(BaseModel):
+    id: str | None = Field(default=None, description="可选，客户端幂等 ID；缺省时服务端生成 UUID")
     name: str
     type: SourceType
-    url: HttpUrl | None = None
+    url: str | None = None  # 接受任意字符串，URL 校验放到 fetcher 层
     config: dict = Field(default_factory=dict)
     headers: dict[str, str] = Field(default_factory=dict)
     cron: str = "*/15 * * * *"
