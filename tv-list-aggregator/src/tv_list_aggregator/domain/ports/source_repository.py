@@ -1,0 +1,16 @@
+"""数据源仓储接口。"""
+from __future__ import annotations
+
+from typing import Protocol
+
+from ..models.source import TVListSource
+
+
+class SourceRepository(Protocol):
+    """数据源仓储协议。"""
+
+    async def get(self, source_id: str) -> TVListSource | None: ...
+    async def list(self, *, status: str | None = None) -> list[TVListSource]: ...
+    async def add(self, source: TVListSource) -> None: ...
+    async def update(self, source: TVListSource) -> None: ...
+    async def delete(self, source_id: str) -> None: ...

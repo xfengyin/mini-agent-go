@@ -1,0 +1,8 @@
+version: 1
+name: classify
+description: 推断节目标签（类型/地区/语言）
+user_template: |
+  对以下 JSON 数组中的每个节目补充 tags 字段（仅在信息可推断时），格式：{"label":"新闻","category":"genre"}。
+  category 允许值：genre / region / language / rating。
+  输入：{{ payload }}
+  仅返回 JSON。

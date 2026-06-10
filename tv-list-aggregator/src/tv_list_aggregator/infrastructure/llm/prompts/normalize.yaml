@@ -1,0 +1,7 @@
+version: 1
+name: normalize
+description: 标准化节目字段、纠错
+user_template: |
+  将以下 JSON 修正为标准格式：timezone 缺失则填 "UTC"，title 去前后空格，start/end 必须是 ISO8601。
+  输入：{{ payload }}
+  仅返回修正后的 JSON。

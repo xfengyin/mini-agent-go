@@ -1,0 +1,25 @@
+version: 1
+sources:
+  - id: demo-json
+    name: Demo JSON API
+    type: http_json
+    url: https://example.com/epg.json
+    cron: "*/30 * * * *"
+    parser: json
+    priority: 5
+  - id: demo-rss
+    name: Demo RSS
+    type: rss
+    url: https://example.com/epg.xml
+    cron: "0 */1 * * *"
+    parser: llm
+    priority: 3
+  - id: demo-html
+    name: Demo HTML Scraper
+    type: html_scrape
+    url: https://example.com/schedule
+    config:
+      wait_selector: ".program-list"
+    cron: "*/15 * * * *"
+    parser: llm
+    priority: 4

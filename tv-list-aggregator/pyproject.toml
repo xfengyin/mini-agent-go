@@ -1,0 +1,79 @@
+[build-system]
+requires = ["hatchling>=1.18"]
+build-backend = "hatchling.build"
+
+[project]
+name = "tv-list-aggregator"
+version = "0.1.0"
+description = "Enterprise-grade TV List aggregation AI Agent"
+requires-python = ">=3.11"
+dependencies = [
+  "fastapi>=0.110",
+  "uvicorn[standard]>=0.27",
+  "pydantic>=2.6",
+  "pydantic-settings>=2.2",
+  "sqlalchemy[asyncio]>=2.0",
+  "alembic>=1.13",
+  "asyncpg>=0.29",
+  "aiosqlite>=0.19",
+  "redis>=5.0",
+  "httpx>=0.27",
+  "tenacity>=8.2",
+  "slowapi>=0.1.9",
+  "structlog>=24.1",
+  "opentelemetry-api>=1.24",
+  "opentelemetry-sdk>=1.24",
+  "opentelemetry-exporter-otlp>=1.24",
+  "prometheus-client>=0.20",
+  "apscheduler>=3.10",
+  "python-jose[cryptography]>=3.3",
+  "passlib[bcrypt]>=1.7",
+  "cryptography>=42",
+  "selectolax>=0.3.21",
+  "trafilatura>=1.6",
+  "playwright>=1.42",
+  "openai>=1.30",
+  "anthropic>=0.28",
+  "typer>=0.12",
+  "pyyaml>=6.0",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.0",
+  "pytest-asyncio>=0.23",
+  "pytest-cov>=4.1",
+  "respx>=0.21",
+  "fakeredis>=2.21",
+  "ruff>=0.4",
+  "mypy>=1.9",
+  "pre-commit>=3.7",
+  "freezegun>=1.4",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/tv_list_aggregator"]
+
+[tool.ruff]
+line-length = 99
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E","F","I","N","W","UP","B","A","S","C4","PT","RET","SIM"]
+ignore = ["E501"]
+
+[tool.ruff.lint.per-file-ignores]
+"**/*.py" = ["RUF002"]  # 中文括号误报
+"tests/**/*.py" = ["S101", "PT018"]  # 测试中 assert 必需
+"src/tv_list_aggregator/core/settings.py" = ["B008"]  # pydantic Field default_factory
+"src/tv_list_aggregator/interfaces/api/security.py" = ["S105", "S324"]  # JWT 示例密钥
+"src/tv_list_aggregator/plugins/parsers/base.py" = ["A002"]  # id 是值对象属性名
+
+[tool.mypy]
+strict = true
+plugins = ["pydantic.mypy"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+addopts = "-ra --strict-markers"

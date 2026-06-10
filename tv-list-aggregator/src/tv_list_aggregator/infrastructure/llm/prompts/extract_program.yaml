@@ -1,0 +1,14 @@
+version: 1
+name: extract_program
+description: 从异构网页/JSON 文本中抽取节目信息
+system: |
+  你是严格的数据抽取器，仅基于用户提供的内容输出 JSON，禁止编造。
+user_template: |
+  请从以下内容中抽取所有电视节目条目，按 JSON 数组返回：
+  字段：title(string), channel_id(string|null), channel_name(string), start(ISO8601), end(ISO8601), description(string|null)
+  包裹在 {"items":[...]} 顶层对象中。
+  内容：
+  """
+  {{ content }}
+  """
+  仅返回 JSON，不要任何解释。

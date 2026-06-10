@@ -1,0 +1,83 @@
+"""聚合服务：编排 fetch→parse→dedup→save。"""
+from __future__ import annotations
+
+import uuid
+from datetime import UTC, datetime
+
+from ...core.logging import get_logger
+from ..models.crawl_job import CrawlJob, JobStatus
+from ..models.program import TVProgram
+from ..models.source import TVListSource
+from ..ports.fetcher import Fetcher
+from ..ports.job_repository import JobRepository
+from ..ports.parser import Parser
+from ..ports.program_repository import ProgramRepository
+from .dedup_service import DedupService
+from .normalization_service import NormalizationService
+
+log = get_logger(__name__)
+
+
+class AggregationService:
+    """一次抓取编排：构造 job→fetch→parse→normalize→dedup→upsert→更新 job。"""
+
+    def __init__(
+        self,
+        fetcher: Fetcher,
+        parser: Parser,
+        program_repo: ProgramRepository,
+        job_repo: JobRepository,
+        dedup: DedupService,
+        normalizer: NormalizationService,
+    ) -> None:
+        self.fetcher = fetcher
+        self.parser = parser
+        self.program_repo = program_repo
+        self.job_repo = job_repo
+        self.dedup = dedup
+        self.normalizer = normalizer
+
+    async def run_once(self, source: TVListSource) -> CrawlJob:
+        job = CrawlJob(
+            id=str(uuid.uuid4()),
+            source_id=source.id,
+            status=JobStatus.RUNNING,
+            started_at=datetime.now(tz=UTC),
+        )
+        await self.job_repo.add(job)
+        try:
+            if not source.url:
+                raise ValueError(f"source {source.id} has no url")
+            result = await self.fetcher.fetch(str(source.url), headers=source.headers or None)
+            programs = await self.parser.parse(
+                result.body, hint={"source_id": source.id}
+            )
+            programs = [self._apply_norm(p) for p in programs]
+            programs = self.dedup.merge(programs)
+            saved = 0
+            for p in programs:
+                await self.program_repo.upsert(p)
+                saved += 1
+            job.status = JobStatus.SUCCESS
+            job.items_fetched = len(programs)
+            job.items_saved = saved
+            job.finished_at = datetime.now(tz=UTC)
+            await self.job_repo.update(job)
+            log.info(
+                "aggregation.success",
+                source_id=source.id,
+                fetched=len(programs),
+                saved=saved,
+            )
+            return job
+        except Exception as e:
+            job.status = JobStatus.FAILED
+            job.error = str(e)[:1000]
+            job.finished_at = datetime.now(tz=UTC)
+            await self.job_repo.update(job)
+            log.error("aggregation.failed", source_id=source.id, error=str(e))
+            raise
+
+    def _apply_norm(self, p: TVProgram) -> TVProgram:
+        p.title = self.normalizer.normalize_title(p.title)
+        return p
