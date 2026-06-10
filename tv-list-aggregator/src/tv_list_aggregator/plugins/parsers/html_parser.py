@@ -12,7 +12,9 @@ class HTMLParser:
 
     name = "html"
 
-    async def parse(self, content: bytes, *, hint: dict | None = None) -> list[TVProgram]:
+    async def parse(
+        self, content: bytes, *, hint: dict[str, object] | None = None
+    ) -> list[TVProgram]:
         text = trafilatura.extract(content.decode("utf-8", errors="ignore")) or ""
         if not text:
             raise ParseError("no extractable text from html")

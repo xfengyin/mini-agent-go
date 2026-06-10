@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import hashlib
 from datetime import UTC, datetime
+from typing import Any
 
 from ...domain.models.program import TVProgram
 from ...domain.models.value_objects import Channel, TimeSlot
@@ -22,7 +23,7 @@ def to_program(
     end: datetime,
     description: str | None,
     source_id: str,
-    tags: list | None = None,
+    tags: list[dict[str, Any]] | None = None,
 ) -> TVProgram:
     """统一的 TVProgram 构造入口。"""
     now = datetime.now(tz=UTC)

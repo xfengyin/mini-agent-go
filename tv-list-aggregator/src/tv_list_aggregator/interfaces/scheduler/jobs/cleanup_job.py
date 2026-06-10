@@ -3,8 +3,10 @@ from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
 
-from .....core.logging import get_logger
-from .....domain.ports.job_repository import JobRepository
+from .....core.logging import get_logger  # type: ignore[import-not-found]  # path resolution
+from .....domain.ports.job_repository import (
+    JobRepository,  # type: ignore[import-not-found]  # path resolution
+)
 
 log = get_logger(__name__)
 

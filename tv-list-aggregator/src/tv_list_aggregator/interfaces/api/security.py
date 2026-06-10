@@ -2,11 +2,11 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
-from typing import Annotated
+from typing import Annotated, Any
 
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
-from jose import JWTError, jwt
+from jose import JWTError, jwt  # type: ignore[import-untyped]
 
 from ...core.settings import get_settings
 
@@ -20,22 +20,25 @@ def create_access_token(sub: str, role: str = ROLE_USER, ttl_min: int | None = N
     """签发 JWT。"""
     s = get_settings()
     ttl = ttl_min or s.access_token_ttl_min
-    payload = {
+    payload: dict[str, Any] = {
         "sub": sub,
         "role": role,
         "exp": datetime.now(tz=UTC) + timedelta(minutes=ttl),
     }
     # SecretStr.get_secret_value() 显式取值
-    return jwt.encode(payload, s.secret_key.get_secret_value(), algorithm=s.jwt_algorithm)
+    encoded: str = jwt.encode(  # type: ignore[no-any-return]
+        payload, s.secret_key.get_secret_value(), algorithm=s.jwt_algorithm
+    )
+    return encoded
 
 
 def require_role(required: str):
     """依赖注入：要求 JWT 中具有指定角色（admin 始终通过）。"""
 
-    def _checker(token: Annotated[str, Depends(oauth2_scheme)]) -> dict:
+    def _checker(token: Annotated[str, Depends(oauth2_scheme)]) -> dict[str, Any]:
         s = get_settings()
         try:
-            payload = jwt.decode(
+            payload: dict[str, Any] = jwt.decode(  # type: ignore[assignment]
                 token, s.secret_key.get_secret_value(), algorithms=[s.jwt_algorithm]
             )
         except JWTError as e:

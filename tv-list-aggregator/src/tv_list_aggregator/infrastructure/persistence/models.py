@@ -8,6 +8,8 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from .sqlalchemy_base import Base
 
+__all__ = ["Base", "SourceRow", "ProgramRow", "JobRow", "UserRow", "SourceHealthRow"]
+
 
 class SourceRow(Base):
     __tablename__ = "sources"
@@ -16,8 +18,8 @@ class SourceRow(Base):
     name: Mapped[str] = mapped_column(String(255))
     type: Mapped[str] = mapped_column(String(32), index=True)
     url: Mapped[str | None] = mapped_column(String(2048), nullable=True)
-    config: Mapped[dict] = mapped_column(JSON, default=dict)
-    headers: Mapped[dict] = mapped_column(JSON, default=dict)
+    config: Mapped[dict[str, object]] = mapped_column(JSON, default=dict)
+    headers: Mapped[dict[str, str]] = mapped_column(JSON, default=dict)
     cron: Mapped[str] = mapped_column(String(64), default="*/15 * * * *")
     priority: Mapped[int] = mapped_column(Integer, default=5)
     status: Mapped[str] = mapped_column(String(16), default="active", index=True)
@@ -40,8 +42,8 @@ class ProgramRow(Base):
     start_at: Mapped[datetime] = mapped_column(DateTime, index=True)
     end_at: Mapped[datetime] = mapped_column(DateTime)
     timezone: Mapped[str] = mapped_column(String(64), default="UTC")
-    tags: Mapped[list] = mapped_column(JSON, default=list)
-    source_ids: Mapped[list] = mapped_column(JSON, default=list)
+    tags: Mapped[list[object]] = mapped_column(JSON, default=list)
+    source_ids: Mapped[list[str]] = mapped_column(JSON, default=list)
     identity_key: Mapped[str] = mapped_column(String(128), index=True, unique=True)
     version: Mapped[int] = mapped_column(Integer, default=1)
     created_at: Mapped[datetime] = mapped_column(DateTime)

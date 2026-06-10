@@ -32,4 +32,4 @@ def configure_logging(level: str = "INFO") -> None:
 
 def get_logger(name: str | None = None) -> structlog.stdlib.BoundLogger:
     """获取绑定到模块名的 logger。"""
-    return structlog.get_logger(name)
+    return structlog.get_logger(name)  # type: ignore[no-any-return]

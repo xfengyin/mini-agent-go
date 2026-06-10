@@ -8,7 +8,12 @@ from __future__ import annotations
 from collections.abc import AsyncIterator
 
 from fastapi import Depends, Request
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+from sqlalchemy.ext.asyncio import (
+    AsyncEngine,
+    AsyncSession,
+    async_sessionmaker,
+    create_async_engine,
+)
 
 from ...core.settings import get_settings
 from ...infrastructure.persistence.job_repository_impl import SQLAlchemyJobRepository
@@ -19,11 +24,11 @@ from ...infrastructure.persistence.source_repository_impl import (
     SQLAlchemySourceRepository,
 )
 
-_engine = None
+_engine: AsyncEngine | None = None
 _session_factory: async_sessionmaker[AsyncSession] | None = None
 
 
-def _get_or_create_engine():
+def _get_or_create_engine() -> AsyncEngine:
     """尝试从 app.state 读 engine，否则懒加载 settings。"""
     global _engine
     if _engine is not None:
@@ -51,7 +56,9 @@ def reset_deps() -> None:
 
 async def get_session(request: Request) -> AsyncIterator[AsyncSession]:
     """每次请求返回一个 session。优先用 lifespan 注入的 session_factory。"""
-    sf = getattr(request.app.state, "session_factory", None) or _get_or_create_session_factory()
+    sf: async_sessionmaker[AsyncSession] = (
+        getattr(request.app.state, "session_factory", None) or _get_or_create_session_factory()
+    )
     async with sf() as session:
         yield session
 
@@ -59,11 +66,11 @@ async def get_session(request: Request) -> AsyncIterator[AsyncSession]:
 async def get_source_repo(
     request: Request,
     session: AsyncSession = Depends(get_session),
-):
+) -> SQLAlchemySourceRepository:
     """优先从 app.state.source_repo 读取（lifespan 注入或测试 mock），
     否则回退到基于 session 构造（兼容脚本/默认场景）。
     """
-    injected = getattr(request.app.state, "source_repo", None)
+    injected: SQLAlchemySourceRepository | None = getattr(request.app.state, "source_repo", None)
     if injected is not None:
         return injected
     return SQLAlchemySourceRepository(session)
@@ -72,9 +79,9 @@ async def get_source_repo(
 async def get_program_repo(
     request: Request,
     session: AsyncSession = Depends(get_session),
-):
+) -> SQLAlchemyProgramRepository:
     """优先从 app.state.program_repo 读取，否则回退。"""
-    injected = getattr(request.app.state, "program_repo", None)
+    injected: SQLAlchemyProgramRepository | None = getattr(request.app.state, "program_repo", None)
     if injected is not None:
         return injected
     return SQLAlchemyProgramRepository(session)
@@ -83,9 +90,9 @@ async def get_program_repo(
 async def get_job_repo(
     request: Request,
     session: AsyncSession = Depends(get_session),
-):
+) -> SQLAlchemyJobRepository:
     """优先从 app.state.job_repo 读取，否则回退。"""
-    injected = getattr(request.app.state, "job_repo", None)
+    injected: SQLAlchemyJobRepository | None = getattr(request.app.state, "job_repo", None)
     if injected is not None:
         return injected
     return SQLAlchemyJobRepository(session)

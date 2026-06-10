@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import os
+from typing import Any
 
 from ...core.exceptions import LLMError
 from ...domain.ports.llm import LLM
@@ -20,12 +21,17 @@ class AnthropicAdapter(LLM):
 
             client = AsyncAnthropic(api_key=self._api_key)
             msg = await client.messages.create(
-                model=self.model,
+                model=self.model,  # type: ignore[arg-type]
                 max_tokens=4096,
                 messages=[{"role": "user", "content": prompt}],
             )
             # 提取 text 块
-            parts = [b.text for b in msg.content if getattr(b, "type", None) == "text"]
+            parts: list[str] = []
+            for b in msg.content:
+                block: Any = b
+                if getattr(block, "type", None) == "text":
+                    text_val: object = getattr(block, "text", "")
+                    parts.append(str(text_val))
             return "\n".join(parts)
         except Exception as e:  # noqa: BLE001
             raise LLMError(str(e)) from e

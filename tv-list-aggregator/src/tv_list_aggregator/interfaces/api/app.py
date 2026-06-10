@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import asyncio
 import os
+from collections.abc import AsyncIterator, Callable
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException, Request
@@ -11,10 +12,13 @@ from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from ...core.logging import configure_logging, get_logger
 from ...core.settings import get_settings
 from ...core.tracing import init_tracer
+from ...domain.models.crawl_job import CrawlJob
+from ...domain.models.source import TVListSource
 from ...domain.services.aggregation_service import AggregationService
 from ...domain.services.dedup_service import DedupService
 from ...domain.services.health_check_service import HealthCheckService
@@ -53,12 +57,14 @@ from .routers import admin, auth, channels, dashboard, export, health, jobs, pro
 log = get_logger(__name__)
 
 
-async def _run_alembic_upgrade(cfg) -> None:
+async def _run_alembic_upgrade(cfg: object) -> None:
     """在事件循环里跑 alembic upgrade head。"""
     from alembic import command as alembic_command
 
     loop = asyncio.get_event_loop()
-    await loop.run_in_executor(None, alembic_command.upgrade, cfg, "head")
+    # alembic_command.upgrade 是同步阻塞调用，签名变化频繁，故用 object 包一下
+    func: Callable[[object, str], None] = alembic_command.upgrade  # type: ignore[assignment]
+    await loop.run_in_executor(None, func, cfg, "head")
 
 
 def build_registry(prompts: PromptLoader, router_llm: LLMRouter) -> PluginRegistry:
@@ -85,7 +91,7 @@ def build_registry(prompts: PromptLoader, router_llm: LLMRouter) -> PluginRegist
     return reg
 
 
-async def _seed_default_users(session_factory) -> None:
+async def _seed_default_users(session_factory: async_sessionmaker[AsyncSession]) -> None:
     """根据 seed_users 配置创建/更新种子用户。dev 友好。"""
     s = get_settings()
     if s.is_production() or not s.seed_users:
@@ -110,7 +116,7 @@ async def _seed_default_users(session_factory) -> None:
 
 
 @asynccontextmanager
-async def lifespan(app: FastAPI):
+async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     s = get_settings()
     configure_logging(s.log_level)
     init_tracer("tv-list-aggregator", s.otlp_endpoint)
@@ -140,8 +146,7 @@ async def lifespan(app: FastAPI):
         bootstrap = "0" if s.is_production() else "1"
     if bootstrap == "1":
         try:
-            from ...infrastructure.persistence.models import Base
-
+            from ...infrastructure.persistence.models import Base  # noqa: F401  # Base re-export
             async with engine.begin() as conn:
                 await conn.run_sync(Base.metadata.create_all)
             log.info("app.schema_bootstrapped", url=s.database_url.split("@")[-1])
@@ -170,7 +175,7 @@ async def lifespan(app: FastAPI):
 
     # 注入 aggregator 工厂：每次调用都用 fresh session（admin crawl 端点用）
     class _AggFactory:
-        async def run_once(self, source):
+        async def run_once(self, source: TVListSource) -> CrawlJob:
             async with session_factory() as s:
                 return await AggregationService(
                     fetcher=fetcher,
@@ -205,8 +210,8 @@ async def lifespan(app: FastAPI):
         async with session_factory() as session:
             health_repo = SQLAlchemySourceHealthRepository(session)
             source_repo = SQLAlchemySourceRepository(session)
-            registry_holder = SourceRegistry(source_repo, health_repo)
-            svc = HealthCheckService(fetcher=fetcher, session=session)
+            registry_holder = SourceRegistry(source_repo)
+            svc = HealthCheckService(fetcher=fetcher)
             try:
                 await health_check_loop(
                     svc=svc,
@@ -241,8 +246,13 @@ def create_app() -> FastAPI:
     )
     app.state.limiter = limiter
 
-    async def _http_exception_handler(request: Request, exc: HTTPException) -> JSONResponse:
+    async def _http_exception_handler(request: Request, exc: Exception) -> JSONResponse:
         """HTTPException -> RFC 7807 problem+json。"""
+        if not isinstance(exc, HTTPException):
+            return JSONResponse(
+                {"detail": str(exc)},
+                status_code=500,
+            )
         rid = getattr(request.state, "request_id", None) or "unknown"
         body = {
             "type": "/problems/http-error",
@@ -256,8 +266,13 @@ def create_app() -> FastAPI:
         headers.setdefault("x-request-id", rid)
         return JSONResponse(body, status_code=exc.status_code, headers=headers)
 
-    async def _validation_handler(request: Request, exc: RequestValidationError) -> JSONResponse:
+    async def _validation_handler(request: Request, exc: Exception) -> JSONResponse:
         """RequestValidationError -> RFC 7807 problem+json。"""
+        if not isinstance(exc, RequestValidationError):
+            return JSONResponse(
+                {"detail": str(exc)},
+                status_code=500,
+            )
         rid = getattr(request.state, "request_id", None) or "unknown"
         return JSONResponse(
             {
@@ -275,7 +290,7 @@ def create_app() -> FastAPI:
 
     app.add_exception_handler(HTTPException, _http_exception_handler)
     app.add_exception_handler(RequestValidationError, _validation_handler)
-    app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+    app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)  # type: ignore[arg-type]
     app.add_middleware(RequestIDMiddleware)
     app.add_middleware(ErrorHandlerMiddleware)
     app.include_router(health.router)

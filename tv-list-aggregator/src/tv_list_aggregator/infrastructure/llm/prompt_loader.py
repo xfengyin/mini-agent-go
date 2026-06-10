@@ -2,8 +2,9 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Any
 
-import yaml
+import yaml  # type: ignore[import-untyped]
 
 
 class PromptLoader:
@@ -12,11 +13,12 @@ class PromptLoader:
     def __init__(self, base_dir: str | Path) -> None:
         self.base = Path(base_dir)
 
-    def load(self, name: str) -> dict:
+    def load(self, name: str) -> dict[str, Any]:
         """加载模板原始 dict。"""
         path = self.base / f"{name}.yaml"
         with path.open(encoding="utf-8") as f:
-            return yaml.safe_load(f) or {}
+            data: object = yaml.safe_load(f) or {}
+            return data if isinstance(data, dict) else {}
 
     def render(self, name: str, **variables: object) -> str:
         """加载并使用 {{ var }} 占位符渲染。"""

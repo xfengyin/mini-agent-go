@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from collections import Counter
 from datetime import UTC, datetime, timedelta
+from typing import Any
 
 from fastapi import APIRouter, Depends
 from sqlalchemy import func, select
@@ -27,7 +28,7 @@ async def dashboard_summary(
     src_repo: SQLAlchemySourceRepository = Depends(get_source_repo),
     prog_repo: SQLAlchemyProgramRepository = Depends(get_program_repo),
     job_repo: SQLAlchemyJobRepository = Depends(get_job_repo),
-) -> dict:
+) -> dict[str, Any]:
     """聚合给 GUI 用的整体快照：节目数 / 源数 / 任务数 / 健康度。"""
     # 节目总数 + 24h 内节目数
     now = datetime.now(tz=UTC)
@@ -39,12 +40,12 @@ async def dashboard_summary(
     # 源统计
     sources = await src_repo.list()
     sources_total = len(sources)
-    sources_by_status = Counter(s.status for s in sources)
-    sources_by_type = Counter(s.type.value for s in sources)
+    sources_by_status: Counter[str] = Counter(s.status for s in sources)
+    sources_by_type: Counter[str] = Counter(s.type.value for s in sources)
 
     # 最近任务
     recent_jobs = await job_repo.list(limit=10)
-    jobs_by_status = Counter(j.status.value for j in recent_jobs)
+    jobs_by_status: Counter[str] = Counter(j.status.value for j in recent_jobs)
 
     return {
         "generated_at": now.isoformat(),
@@ -54,8 +55,8 @@ async def dashboard_summary(
         },
         "sources": {
             "total": sources_total,
-            "active": sources_by_status.get("active", 0),
-            "disabled": sources_by_status.get("disabled", 0),
+            "active": sources_by_status["active"],
+            "disabled": sources_by_status["disabled"],
             "by_type": dict(sources_by_type),
         },
         "jobs": {
@@ -81,7 +82,7 @@ async def dashboard_timeline(
     hours: int = 6,
     channel: str | None = None,
     session: AsyncSession = Depends(get_session),
-) -> dict:
+) -> dict[str, Any]:
     """EPG 时间轴数据：返回 N 小时内每个频道的节目块。
 
     给 GUI 横向时间轴用。
@@ -99,7 +100,7 @@ async def dashboard_timeline(
     rows = (await session.execute(stmt)).scalars().all()
 
     # 按频道分组
-    by_channel: dict[str, list[dict]] = {}
+    by_channel: dict[str, list[dict[str, Any]]] = {}
     for r in rows:
         by_channel.setdefault(r.channel_name, []).append(
             {
@@ -126,7 +127,7 @@ async def dashboard_timeline(
 
 
 @router.get("/top-channels")
-async def top_channels(limit: int = 10, session: AsyncSession = Depends(get_session)) -> dict:
+async def top_channels(limit: int = 10, session: AsyncSession = Depends(get_session)) -> dict[str, Any]:
     """节目数 Top N 频道。"""
     stmt = (
         select(

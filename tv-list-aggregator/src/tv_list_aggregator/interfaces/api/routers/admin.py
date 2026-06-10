@@ -1,6 +1,8 @@
 """管理员路由：手动触发抓取、查看插件清单、种子数据。"""
 from __future__ import annotations
 
+from typing import Any
+
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -15,7 +17,7 @@ router = APIRouter(prefix="/admin", tags=["admin"])
 
 
 @router.get("/plugins")
-async def list_plugins(request: Request) -> dict:
+async def list_plugins(request: Request) -> dict[str, Any]:
     registry: PluginRegistry | None = getattr(request.app.state, "registry", None)
     if registry is None:
         raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, "registry not initialized")
@@ -31,7 +33,7 @@ async def trigger_crawl(
     request: Request,
     repo: SQLAlchemySourceRepository = Depends(get_source_repo),
     session: AsyncSession = Depends(get_session),
-) -> dict:
+) -> dict[str, Any]:
     agg = getattr(request.app.state, "agg", None)
     if agg is None:
         raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, "aggregator not initialized")
@@ -48,13 +50,13 @@ async def trigger_crawl_all(
     request: Request,
     repo: SQLAlchemySourceRepository = Depends(get_source_repo),
     session: AsyncSession = Depends(get_session),
-) -> dict:
+) -> dict[str, Any]:
     """触发所有 active 源的抓取。返回每个源对应的 job_id 或 error。"""
     agg = getattr(request.app.state, "agg", None)
     if agg is None:
         raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, "aggregator not initialized")
     sources = await repo.list(status="active")
-    results: list[dict] = []
+    results: list[dict[str, Any]] = []
     for src in sources:
         try:
             job = await agg.run_once(src)
@@ -73,7 +75,7 @@ async def trigger_crawl_all(
 
 
 @router.post("/seed")
-async def seed_data(request: Request) -> dict:
+async def seed_data(request: Request) -> dict[str, Any]:
     """开发期：把示例数据写入数据库（生产环境拒绝执行）。"""
     s = get_settings()
     if s.is_production():
@@ -89,7 +91,7 @@ async def seed_data(request: Request) -> dict:
 
 
 @router.post("/reseed")
-async def reseed_data(request: Request) -> dict:
+async def reseed_data(request: Request) -> dict[str, Any]:
     """开发期：清空并重新写入示例数据。"""
     s = get_settings()
     if s.is_production():

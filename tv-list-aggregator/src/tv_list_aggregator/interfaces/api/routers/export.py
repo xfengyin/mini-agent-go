@@ -22,7 +22,7 @@ async def export_programs_csv(
     end: datetime = Query(...),
     channel_id: str | None = None,
     repo: SQLAlchemyProgramRepository = Depends(get_program_repo),
-):
+) -> StreamingResponse:
     rows = await repo.list_by_range(start, end, channel_id=channel_id)
     buf = io.StringIO()
     writer = csv.writer(buf)

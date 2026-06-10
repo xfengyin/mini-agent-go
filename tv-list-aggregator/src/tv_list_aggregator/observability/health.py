@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from typing import Any
 
 from ..domain.ports.source_repository import SourceRepository
 from ..domain.services.health_check_service import HealthCheckService
@@ -9,10 +10,10 @@ from ..domain.services.health_check_service import HealthCheckService
 
 async def detailed_health(
     repo: SourceRepository, health_svc: HealthCheckService
-) -> dict:
+) -> dict[str, Any]:
     """逐源健康检查 + 汇总。"""
     sources = await repo.list()
-    results: list[dict] = []
+    results: list[dict[str, Any]] = []
     for s in sources:
         h = await health_svc.check(s)
         results.append(

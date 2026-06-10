@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -17,6 +18,6 @@ class ProgramOut(BaseModel):
     start: datetime
     end: datetime
     timezone: str
-    tags: list[dict] = Field(default_factory=list)
+    tags: list[dict[str, Any]] = Field(default_factory=list)
     source_ids: list[str] = Field(default_factory=list)
     version: int

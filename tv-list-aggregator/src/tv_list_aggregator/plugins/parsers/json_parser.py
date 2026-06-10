@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 from datetime import datetime
+from typing import Any
 
 from ...core.exceptions import ParseError
 from ...domain.models.program import TVProgram
@@ -15,7 +16,9 @@ class JSONParser:
 
     name = "json"
 
-    async def parse(self, content: bytes, *, hint: dict | None = None) -> list[TVProgram]:
+    async def parse(
+        self, content: bytes, *, hint: dict[str, Any] | None = None
+    ) -> list[TVProgram]:
         source_id = (hint or {}).get("source_id", "unknown")
         try:
             data = json.loads(content)

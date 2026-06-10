@@ -20,6 +20,15 @@ class SQLAlchemyProgramRepository(ProgramRepository):
 
     @staticmethod
     def _to_domain(r: ProgramRow) -> TVProgram:
+        tags_raw: list[object] = r.tags or []
+        tag_models: list[Tag] = []
+        for t in tags_raw:
+            if isinstance(t, dict) and "label" in t and "category" in t:
+                label_obj: object = t["label"]
+                category_obj: object = t["category"]
+                tag_models.append(
+                    Tag(label=str(label_obj), category=str(category_obj))
+                )
         return TVProgram(
             id=r.id,
             title=r.title,
@@ -32,7 +41,7 @@ class SQLAlchemyProgramRepository(ProgramRepository):
                 language=r.channel_language,
             ),
             slot=TimeSlot(start=r.start_at, end=r.end_at, timezone=r.timezone),
-            tags=[Tag(label=t["label"], category=t["category"]) for t in (r.tags or [])],
+            tags=tag_models,
             source_ids=r.source_ids or [],
             identity_key=r.identity_key,
             created_at=r.created_at,

@@ -9,8 +9,9 @@ from __future__ import annotations
 
 import uuid
 from datetime import UTC, datetime, timedelta
+from typing import Any
 
-from sqlalchemy import select
+from sqlalchemy import select, table
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from ...core.logging import get_logger
@@ -62,7 +63,7 @@ def _id(prefix: str = "") -> str:
 def _build_sample_sources() -> list[TVListSource]:
     """构造 3 个示例数据源。"""
     now = datetime.now(tz=UTC)
-    common = {
+    common: dict[str, Any] = {
         "config": {},
         "headers": {},
         "cron": "*/15 * * * *",
@@ -165,7 +166,7 @@ def _build_sample_programs(sources: list[TVListSource]) -> list[ProgramRow]:
 def _build_sample_jobs(sources: list[TVListSource]) -> list[JobRow]:
     """构造 6 条历史任务。"""
     now = datetime.now(tz=UTC)
-    job_specs = [
+    job_specs: list[tuple[int, JobStatus, int, int, int, str | None]] = [
         # (source_idx, status, minutes_ago, fetched, saved, error)
         (0, JobStatus.SUCCESS, 5, 142, 138, None),
         (1, JobStatus.SUCCESS, 35, 96, 95, None),
@@ -194,7 +195,9 @@ def _build_sample_jobs(sources: list[TVListSource]) -> list[JobRow]:
     return rows
 
 
-async def seed_if_empty(session_factory: async_sessionmaker[AsyncSession]) -> dict:
+async def seed_if_empty(
+    session_factory: async_sessionmaker[AsyncSession],
+) -> dict[str, Any]:
     """在空库中插入演示数据。返回写入统计。"""
     async with session_factory() as session:
         existing_sources = (await session.execute(select(SourceRow))).first()
@@ -236,11 +239,16 @@ async def seed_if_empty(session_factory: async_sessionmaker[AsyncSession]) -> di
     }
 
 
-async def reset_and_seed(session_factory: async_sessionmaker[AsyncSession]) -> dict:
+async def reset_and_seed(
+    session_factory: async_sessionmaker[AsyncSession],
+) -> dict[str, Any]:
     """清空 + 重新插入（dev 调试用）。"""
     async with session_factory() as session:
         for tbl in (ProgramRow, JobRow, SourceRow):
-            await session.execute(tbl.__table__.delete())
+            # 用 sqlalchemy 顶层 Table 对象触发 delete（避开 ORM 类 delete 冲突）
+            await session.execute(
+                table(tbl.__tablename__).delete()
+            )
         await session.commit()
 
     return await seed_if_empty(session_factory)

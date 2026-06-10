@@ -4,11 +4,12 @@
 """
 from __future__ import annotations
 
+from collections.abc import Awaitable, Callable
 from typing import Any
 
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
-from starlette.responses import JSONResponse
+from starlette.responses import JSONResponse, Response
 
 from ....core.exceptions import PermanentError, TransientError, TVListBaseError
 from ....core.logging import get_logger
@@ -43,7 +44,9 @@ def _problem(
 
 
 class ErrorHandlerMiddleware(BaseHTTPMiddleware):
-    async def dispatch(self, request: Request, call_next):
+    async def dispatch(
+        self, request: Request, call_next: Callable[[Request], Awaitable[Response]]
+    ) -> Response:
         try:
             return await call_next(request)
         except TransientError as e:

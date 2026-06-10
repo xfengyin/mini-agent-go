@@ -4,6 +4,7 @@ from __future__ import annotations
 import uuid
 from collections.abc import Callable
 from datetime import UTC, datetime
+from typing import Any
 
 from ...core.logging import get_logger
 from ..models.crawl_job import CrawlJob, JobStatus
@@ -18,8 +19,8 @@ from .normalization_service import NormalizationService
 
 log = get_logger(__name__)
 
-# 简单类型别名：session 工厂
-SessionFactory = Callable
+# 简单类型别名：session 工厂（async_sessionmaker[AsyncSession]）
+SessionFactory = Callable[..., Any]
 
 
 class AggregationService:

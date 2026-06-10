@@ -46,7 +46,7 @@ class SQLAlchemyUserRepository(UserRepository):
         return User(
             id=row.id,
             username=row.username,
-            role=row.role,  # type: ignore[arg-type]
+            role=row.role,
             created_at=row.created_at,
             disabled=row.disabled,
         )

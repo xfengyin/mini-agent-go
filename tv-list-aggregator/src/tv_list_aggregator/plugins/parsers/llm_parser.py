@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 from datetime import datetime
+from typing import Any
 
 from ...core.exceptions import LLMError, ParseError
 from ...domain.models.program import TVProgram
@@ -21,7 +22,9 @@ class LLMParser:
         self.llm = llm
         self.prompts = prompts
 
-    async def parse(self, content: bytes, *, hint: dict | None = None) -> list[TVProgram]:
+    async def parse(
+        self, content: bytes, *, hint: dict[str, Any] | None = None
+    ) -> list[TVProgram]:
         source_id = (hint or {}).get("source_id", "unknown")
         text = content.decode("utf-8", errors="ignore")[:30000]
         prompt = self.prompts.render("extract_program", content=text)

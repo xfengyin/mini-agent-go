@@ -4,7 +4,7 @@ from __future__ import annotations
 import uuid
 from datetime import UTC, datetime
 
-from passlib.context import CryptContext
+from passlib.context import CryptContext  # type: ignore[import-untyped]
 
 from ...core.logging import get_logger
 from ...core.settings import get_settings
@@ -12,18 +12,18 @@ from ...infrastructure.persistence.user_repository_impl import SQLAlchemyUserRep
 from ..models.user import User
 
 log = get_logger(__name__)
-_pwd = CryptContext(schemes=["bcrypt"], deprecated="auto")
+_pwd = CryptContext(schemes=["bcrypt"], deprecated="auto")  # type: ignore[call-arg]
 
 
 def hash_password(plain: str) -> str:
     """bcrypt 哈希。"""
-    return _pwd.hash(plain)
+    return _pwd.hash(plain)  # type: ignore[no-any-return]
 
 
 def verify_password(plain: str, hashed: str) -> bool:
     """bcrypt 校验。"""
     try:
-        return _pwd.verify(plain, hashed)
+        return bool(_pwd.verify(plain, hashed))
     except Exception:
         return False
 
@@ -64,7 +64,7 @@ class AuthService:
         user = User(
             id=str(uuid.uuid4()),
             username=username,
-            role=role,  # type: ignore[arg-type]
+            role=role,
             created_at=datetime.now(UTC),
             disabled=False,
         )

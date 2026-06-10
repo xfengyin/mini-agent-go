@@ -5,9 +5,10 @@ import asyncio
 import time
 from collections.abc import Awaitable, Callable
 from enum import Enum
-from typing import TypeVar
+from typing import ParamSpec, TypeVar
 
 T = TypeVar("T")
+P = ParamSpec("P")
 
 
 class CircuitState(str, Enum):
@@ -37,7 +38,9 @@ class AsyncCircuitBreaker:
     def state(self) -> CircuitState:
         return self._state
 
-    async def call(self, func: Callable[..., Awaitable[T]], *args, **kwargs) -> T:
+    async def call(
+        self, func: Callable[P, Awaitable[T]], *args: P.args, **kwargs: P.kwargs
+    ) -> T:
         async with self._lock:
             now = time.monotonic()
             if self._state is CircuitState.OPEN:

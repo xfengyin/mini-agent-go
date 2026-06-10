@@ -34,7 +34,7 @@ class TVListSource(BaseModel):
     name: str = Field(min_length=1, max_length=255)
     type: SourceType
     url: str | None = None  # 接受任意字符串；具体 URL 校验由 fetcher 层负责
-    config: dict = Field(default_factory=dict)
+    config: dict[str, object] = Field(default_factory=dict)
     headers: dict[str, str] = Field(default_factory=dict)
     cron: str = "*/15 * * * *"
     priority: int = Field(default=5, ge=0, le=10)

@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, HttpUrl
 
@@ -13,7 +14,7 @@ class SourceCreate(BaseModel):
     name: str
     type: SourceType
     url: str | None = None  # 接受任意字符串，URL 校验放到 fetcher 层
-    config: dict = Field(default_factory=dict)
+    config: dict[str, Any] = Field(default_factory=dict)
     headers: dict[str, str] = Field(default_factory=dict)
     cron: str = "*/15 * * * *"
     priority: int = 5
@@ -25,7 +26,7 @@ class SourceUpdate(BaseModel):
     name: str | None = None
     type: SourceType | None = None
     url: str | None = None
-    config: dict | None = None
+    config: dict[str, Any] | None = None
     headers: dict[str, str] | None = None
     cron: str | None = None
     priority: int | None = None

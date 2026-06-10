@@ -13,7 +13,7 @@ router = APIRouter(prefix="/channels", tags=["channels"])
 
 
 @router.get("", response_model=list[ChannelOut])
-async def list_channels(session: AsyncSession = Depends(get_session)):
+async def list_channels(session: AsyncSession = Depends(get_session)) -> list[ChannelOut]:
     """返回所有不重复频道，按节目数降序。"""
     stmt = (
         select(

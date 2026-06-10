@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import contextlib
 import logging
-from collections.abc import Callable
+from collections.abc import Awaitable, Callable
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
@@ -25,7 +25,7 @@ class JobScheduler:
         if self.sched.running:
             self.sched.shutdown(wait=False)
 
-    def add_cron(self, job_id: str, cron: str, func: Callable) -> None:
+    def add_cron(self, job_id: str, cron: str, func: Callable[[], Awaitable[None]]) -> None:
         self.sched.add_job(
             func,
             CronTrigger.from_crontab(cron),
@@ -35,7 +35,7 @@ class JobScheduler:
             coalesce=True,
         )
 
-    def add_interval(self, job_id: str, seconds: int, func: Callable) -> None:
+    def add_interval(self, job_id: str, seconds: int, func: Callable[[], Awaitable[None]]) -> None:
         self.sched.add_job(
             func,
             "interval",

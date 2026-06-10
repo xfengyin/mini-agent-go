@@ -20,7 +20,7 @@ async def list_programs(
     end: datetime = Query(...),
     channel_id: str | None = None,
     repo: SQLAlchemyProgramRepository = Depends(get_program_repo),
-):
+) -> list[ProgramOut]:
     rows = await repo.list_by_range(start, end, channel_id=channel_id)
     out: list[ProgramOut] = []
     for p in rows:
@@ -45,5 +45,5 @@ async def list_programs(
 @router.get("/count")
 async def count_programs(
     repo: SQLAlchemyProgramRepository = Depends(get_program_repo),
-):
+) -> dict[str, int]:
     return {"count": await repo.count()}

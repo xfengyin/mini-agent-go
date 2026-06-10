@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import os
+from typing import Any
 
 from openai import AsyncOpenAI
 
@@ -18,14 +19,15 @@ class OpenAIAdapter(LLM):
 
     async def complete(self, prompt: str, *, json_mode: bool = False) -> str:
         try:
-            kwargs: dict = {
+            kwargs: dict[str, Any] = {
                 "model": self.model,
                 "messages": [{"role": "user", "content": prompt}],
             }
             if json_mode:
                 kwargs["response_format"] = {"type": "json_object"}
             r = await self._client.chat.completions.create(**kwargs)
-            return r.choices[0].message.content or ""
+            content = r.choices[0].message.content
+            return content if content is not None else ""
         except Exception as e:  # noqa: BLE001
             raise LLMError(str(e)) from e
 
