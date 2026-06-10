@@ -48,7 +48,7 @@ from ...plugins.sources.rss_source import RSSSource
 from .middleware.error_handler import ErrorHandlerMiddleware
 from .middleware.rate_limit import limiter
 from .middleware.request_id import RequestIDMiddleware
-from .routers import admin, auth, dashboard, export, health, jobs, programs, sources
+from .routers import admin, auth, channels, dashboard, export, health, jobs, programs, sources
 
 log = get_logger(__name__)
 
@@ -282,6 +282,7 @@ def create_app() -> FastAPI:
     app.include_router(auth.router, prefix="/api/v1")
     app.include_router(sources.router, prefix="/api/v1")
     app.include_router(programs.router, prefix="/api/v1")
+    app.include_router(channels.router, prefix="/api/v1")
     app.include_router(jobs.router, prefix="/api/v1")
     app.include_router(export.router, prefix="/api/v1")
     app.include_router(admin.router, prefix="/api/v1")
