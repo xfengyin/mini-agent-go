@@ -9,6 +9,7 @@ from fastapi import APIRouter, Depends
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from ....core.cache import TTLCache
 from ....infrastructure.persistence.job_repository_impl import SQLAlchemyJobRepository
 from ....infrastructure.persistence.models import ProgramRow
 from ....infrastructure.persistence.program_repository_impl import (
@@ -21,6 +22,11 @@ from ..deps import get_job_repo, get_program_repo, get_session, get_source_repo
 
 router = APIRouter(prefix="/dashboard", tags=["dashboard"])
 
+# 进程内缓存：dashboard 整体快照每 30s 刷新一次，
+# 减少对 DB 的多表聚合开销。key 固定为 "dashboard:summary"。
+_DASHBOARD_SUMMARY_TTL_SECONDS = 30.0
+_summary_cache: TTLCache[dict[str, Any]] = TTLCache()
+
 
 @router.get("/summary")
 async def dashboard_summary(
@@ -29,52 +35,65 @@ async def dashboard_summary(
     prog_repo: SQLAlchemyProgramRepository = Depends(get_program_repo),
     job_repo: SQLAlchemyJobRepository = Depends(get_job_repo),
 ) -> dict[str, Any]:
-    """聚合给 GUI 用的整体快照：节目数 / 源数 / 任务数 / 健康度。"""
-    # 节目总数 + 24h 内节目数
-    now = datetime.now(tz=UTC)
-    cutoff = now - timedelta(hours=24)
-    total_programs = await prog_repo.count()
-    recent_programs_q = select(func.count(ProgramRow.id)).where(ProgramRow.start_at >= cutoff)
-    recent_programs = (await session.execute(recent_programs_q)).scalar() or 0
+    """聚合给 GUI 用的整体快照：节目数 / 源数 / 任务数 / 健康度。
 
-    # 源统计
-    sources = await src_repo.list()
-    sources_total = len(sources)
-    sources_by_status: Counter[str] = Counter(s.status for s in sources)
-    sources_by_type: Counter[str] = Counter(s.type.value for s in sources)
+    30s TTL：避免短时间内（<30s）重复跑多表 COUNT + JOIN，
+    命中缓存时直接返回上次结果，factory 不再被调用。
+    """
+    cache_key = "dashboard:summary"
 
-    # 最近任务
-    recent_jobs = await job_repo.list(limit=10)
-    jobs_by_status: Counter[str] = Counter(j.status.value for j in recent_jobs)
+    async def _compute() -> dict[str, Any]:
+        # 节目总数 + 24h 内节目数
+        now = datetime.now(tz=UTC)
+        cutoff = now - timedelta(hours=24)
+        total_programs = await prog_repo.count()
+        recent_programs_q = (
+            select(func.count(ProgramRow.id)).where(ProgramRow.start_at >= cutoff)
+        )
+        recent_programs = (await session.execute(recent_programs_q)).scalar() or 0
 
-    return {
-        "generated_at": now.isoformat(),
-        "programs": {
-            "total": total_programs,
-            "last_24h": int(recent_programs),
-        },
-        "sources": {
-            "total": sources_total,
-            "active": sources_by_status["active"],
-            "disabled": sources_by_status["disabled"],
-            "by_type": dict(sources_by_type),
-        },
-        "jobs": {
-            "recent": [
-                {
-                    "id": j.id,
-                    "source_id": j.source_id,
-                    "status": j.status.value,
-                    "started_at": j.started_at.isoformat() if j.started_at else None,
-                    "finished_at": j.finished_at.isoformat() if j.finished_at else None,
-                    "items_fetched": j.items_fetched,
-                    "items_saved": j.items_saved,
-                }
-                for j in recent_jobs
-            ],
-            "by_status": dict(jobs_by_status),
-        },
-    }
+        # 源统计
+        sources = await src_repo.list()
+        sources_total = len(sources)
+        sources_by_status: Counter[str] = Counter(s.status for s in sources)
+        sources_by_type: Counter[str] = Counter(s.type.value for s in sources)
+
+        # 最近任务
+        recent_jobs = await job_repo.list(limit=10)
+        jobs_by_status: Counter[str] = Counter(j.status.value for j in recent_jobs)
+
+        return {
+            "generated_at": now.isoformat(),
+            "programs": {
+                "total": total_programs,
+                "last_24h": int(recent_programs),
+            },
+            "sources": {
+                "total": sources_total,
+                "active": sources_by_status["active"],
+                "disabled": sources_by_status["disabled"],
+                "by_type": dict(sources_by_type),
+            },
+            "jobs": {
+                "recent": [
+                    {
+                        "id": j.id,
+                        "source_id": j.source_id,
+                        "status": j.status.value,
+                        "started_at": j.started_at.isoformat() if j.started_at else None,
+                        "finished_at": j.finished_at.isoformat() if j.finished_at else None,
+                        "items_fetched": j.items_fetched,
+                        "items_saved": j.items_saved,
+                    }
+                    for j in recent_jobs
+                ],
+                "by_status": dict(jobs_by_status),
+            },
+        }
+
+    return await _summary_cache.get_or_set(
+        cache_key, _DASHBOARD_SUMMARY_TTL_SECONDS, _compute
+    )
 
 
 @router.get("/timeline")
