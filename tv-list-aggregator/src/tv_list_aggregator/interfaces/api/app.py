@@ -15,6 +15,7 @@ from slowapi.errors import RateLimitExceeded
 from ...core.logging import configure_logging, get_logger
 from ...core.settings import get_settings
 from ...core.tracing import init_tracer
+from ...domain.services.aggregation_service import AggregationService
 from ...domain.services.dedup_service import DedupService
 from ...domain.services.health_check_service import HealthCheckService
 from ...domain.services.normalization_service import NormalizationService
@@ -24,6 +25,10 @@ from ...infrastructure.http.playwright_fetcher import PlaywrightFetcher
 from ...infrastructure.llm.llm_router import LLMRouter
 from ...infrastructure.llm.prompt_loader import PromptLoader
 from ...infrastructure.llm.stub import StubLLM
+from ...infrastructure.persistence.job_repository_impl import SQLAlchemyJobRepository
+from ...infrastructure.persistence.program_repository_impl import (
+    SQLAlchemyProgramRepository,
+)
 from ...infrastructure.persistence.source_health_repository import (
     SQLAlchemySourceHealthRepository,
 )
@@ -162,6 +167,32 @@ async def lifespan(app: FastAPI):
 
     # seed 种子用户（dev only）
     await _seed_default_users(session_factory)
+
+    # 注入 aggregator 工厂：每次调用都用 fresh session（admin crawl 端点用）
+    class _AggFactory:
+        async def run_once(self, source):
+            async with session_factory() as s:
+                return await AggregationService(
+                    fetcher=fetcher,
+                    parser=registry.get_parser("json"),
+                    program_repo=SQLAlchemyProgramRepository(s),
+                    job_repo=SQLAlchemyJobRepository(s),
+                    dedup=dedup,
+                    normalizer=normalizer,
+                    session_factory=session_factory,
+                ).run_once(source)
+
+    app.state.agg = _AggFactory()
+
+    # dev + 空库时自动 seed（让 GUI 开箱即有数据）
+    if not s.is_production() and os.environ.get("TV_LIST_AUTO_SEED") != "0":
+        from .seed import seed_if_empty
+
+        try:
+            stats = await seed_if_empty(session_factory)
+            log.info("app.auto_seed", **stats)
+        except Exception as e:  # noqa: BLE001
+            log.warning("app.auto_seed_failed", error=str(e))
 
     # 修复 issue #6：在 lifespan 中启动 JobScheduler
     from ...interfaces.scheduler.jobs.health_check_job import health_check_loop

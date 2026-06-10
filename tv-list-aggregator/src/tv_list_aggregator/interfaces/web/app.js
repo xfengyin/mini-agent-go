@@ -251,9 +251,14 @@
 
   const loadPrograms = async () => {
     try {
-      const list = await api("/programs?limit=60");
-      renderPrograms(list.items || list);
-      dom.programsSub.textContent = `${(list.items || list).length} 条 · sorted by start time`;
+      // /programs 强制要求 start/end；这里给一个 7 天窗口
+      const end = new Date();
+      const start = new Date(end.getTime() - 7 * 24 * 3600 * 1000);
+      const qs = `start=${encodeURIComponent(start.toISOString())}&end=${encodeURIComponent(end.toISOString())}`;
+      const list = await api(`/programs?${qs}`);
+      const items = Array.isArray(list) ? list : list.items || [];
+      renderPrograms(items);
+      dom.programsSub.textContent = `${items.length} 条 · 最近 7 天`;
     } catch (e) {
       dom.programGrid.innerHTML = `<div class="program-grid__loading">⚠ ${e.message}</div>`;
     }
@@ -265,17 +270,20 @@
       return;
     }
     dom.programGrid.innerHTML = items
-      .map(
-        (p) => `<div class="program-card" data-q="${(p.title + " " + (p.channel_name || "")).toLowerCase()}">
+      .map((p) => {
+        // 兼容后端响应字段（start/end）以及历史 mock（start_at/end_at）
+        const pStart = p.start || p.start_at;
+        const pEnd = p.end || p.end_at;
+        return `<div class="program-card" data-q="${(p.title + " " + (p.channel_name || "")).toLowerCase()}">
         <div class="program-card__channel">${escape(p.channel_name || "—")}</div>
         <div class="program-card__title">${escape(p.title)}</div>
         <div class="program-card__time">
-          <span>${fmt.date(p.start_at)}</span>
+          <span>${fmt.date(pStart)}</span>
           <span class="program-card__dot"></span>
-          <span>${fmt.time(p.start_at)} – ${fmt.time(p.end_at)}</span>
+          <span>${fmt.time(pStart)} – ${fmt.time(pEnd)}</span>
         </div>
-      </div>`
-      )
+      </div>`;
+      })
       .join("");
   };
 
@@ -314,9 +322,8 @@
 
   const loadJobs = async () => {
     try {
-      // 后端不一定有 list-jobs，先尝试
-      const list = await api("/admin/jobs?limit=20").catch(() => []);
-      const data = state.data.summary?.jobs?.recent || list;
+      const list = await api("/jobs?limit=20");
+      const data = Array.isArray(list) ? list : list.items || [];
       renderJobs(data);
       dom.jobsSub.textContent = `最近 ${data.length} 条任务`;
     } catch (e) {
