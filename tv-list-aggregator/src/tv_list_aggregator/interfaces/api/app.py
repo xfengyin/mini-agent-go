@@ -8,6 +8,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 
@@ -42,7 +43,7 @@ from ...plugins.sources.rss_source import RSSSource
 from .middleware.error_handler import ErrorHandlerMiddleware
 from .middleware.rate_limit import limiter
 from .middleware.request_id import RequestIDMiddleware
-from .routers import admin, auth, export, health, jobs, programs, sources
+from .routers import admin, auth, dashboard, export, health, jobs, programs, sources
 
 log = get_logger(__name__)
 
@@ -253,6 +254,22 @@ def create_app() -> FastAPI:
     app.include_router(jobs.router, prefix="/api/v1")
     app.include_router(export.router, prefix="/api/v1")
     app.include_router(admin.router, prefix="/api/v1")
+    app.include_router(dashboard.router, prefix="/api/v1")
+
+    # 挂载 Web GUI 静态文件（Codex 风格 dashboard）
+    import os.path
+
+    _web_dir = os.path.join(os.path.dirname(__file__), "..", "web")
+    if os.path.isdir(_web_dir):
+        app.mount("/static", StaticFiles(directory=_web_dir), name="static")
+
+        # 根路径 → 返回 index.html（让 / 打开 GUI，而非 OpenAPI）
+        from fastapi.responses import FileResponse
+
+        @app.get("/", include_in_schema=False)
+        async def _root() -> FileResponse:
+            return FileResponse(os.path.join(_web_dir, "index.html"))
+
     return app
 
 

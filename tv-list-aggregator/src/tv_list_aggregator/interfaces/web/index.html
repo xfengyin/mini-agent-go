@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TVLIST — Program Aggregator</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..900;1,9..144,300..900&family=Instrument+Serif:ital@0;1&family=JetBrains+Mono:ital,wght@0,100..800;1,100..800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+
+<!-- 背景装饰：暗色玻璃质感 + 噪点 -->
+<div class="bg-grain" aria-hidden="true"></div>
+<div class="bg-glow" aria-hidden="true"></div>
+
+<!-- 顶部状态条 -->
+<header class="topbar">
+  <div class="brand">
+    <div class="brand-mark">
+      <span class="dot dot--live"></span>
+    </div>
+    <div class="brand-name">
+      <span class="brand-name__main">TVLIST</span>
+      <span class="brand-name__sub">program&nbsp;aggregator</span>
+    </div>
+  </div>
+
+  <div class="search">
+    <span class="search__icon">⌕</span>
+    <input id="searchInput" class="search__input" type="text"
+           placeholder="搜索频道 / 节目 / 源…" autocomplete="off">
+    <kbd class="search__kbd">/</kbd>
+  </div>
+
+  <div class="topbar-actions">
+    <div class="metric-pill" data-tooltip="健康度">
+      <span class="metric-pill__label">health</span>
+      <span class="metric-pill__value" id="healthPct">—</span>
+    </div>
+    <div class="metric-pill" data-tooltip="节目总数">
+      <span class="metric-pill__label">programs</span>
+      <span class="metric-pill__value" id="programsCount">—</span>
+    </div>
+    <div class="metric-pill" data-tooltip="源数量">
+      <span class="metric-pill__label">sources</span>
+      <span class="metric-pill__value" id="sourcesCount">—</span>
+    </div>
+    <button class="btn btn--ghost" id="refreshBtn" title="刷新">
+      <span class="btn__icon">↻</span>
+    </button>
+    <button class="btn btn--primary" id="triggerCrawlBtn" title="立即抓取">
+      <span class="btn__icon">▶</span>
+      <span>crawl</span>
+    </button>
+  </div>
+</header>
+
+<!-- 左侧导航 -->
+<nav class="sidebar" aria-label="主导航">
+  <ul class="nav">
+    <li class="nav__item is-active" data-view="timeline">
+      <span class="nav__icon">▦</span>
+      <span class="nav__label">Timeline</span>
+      <span class="nav__hint">EPG</span>
+    </li>
+    <li class="nav__item" data-view="programs">
+      <span class="nav__icon">▶</span>
+      <span class="nav__label">Programs</span>
+      <span class="nav__hint" id="programsHint">—</span>
+    </li>
+    <li class="nav__item" data-view="sources">
+      <span class="nav__icon">⌬</span>
+      <span class="nav__label">Sources</span>
+      <span class="nav__hint" id="sourcesHint">—</span>
+    </li>
+    <li class="nav__item" data-view="jobs">
+      <span class="nav__icon">⚙</span>
+      <span class="nav__label">Jobs</span>
+      <span class="nav__hint" id="jobsHint">—</span>
+    </li>
+    <li class="nav__item" data-view="channels">
+      <span class="nav__icon">◉</span>
+      <span class="nav__label">Top Channels</span>
+      <span class="nav__hint">rank</span>
+    </li>
+  </ul>
+
+  <div class="sidebar__foot">
+    <div class="legend">
+      <div class="legend__row"><span class="legend__dot legend__dot--live"></span> LIVE</div>
+      <div class="legend__row"><span class="legend__dot legend__dot--ok"></span> ok</div>
+      <div class="legend__row"><span class="legend__dot legend__dot--warn"></span> warn</div>
+      <div class="legend__row"><span class="legend__dot legend__dot--err"></span> error</div>
+    </div>
+    <div class="ts" id="lastUpdated">—</div>
+  </div>
+</nav>
+
+<!-- 主内容 -->
+<main class="main">
+
+  <!-- 视图：Timeline (EPG) -->
+  <section class="view view--timeline is-active" data-view="timeline">
+    <div class="view__header">
+      <div>
+        <h1 class="view__title">
+          <em>Now</em> on air
+        </h1>
+        <p class="view__sub" id="timelineSub">—</p>
+      </div>
+      <div class="view__controls">
+        <div class="seg">
+          <button class="seg__btn is-active" data-hours="3">3h</button>
+          <button class="seg__btn" data-hours="6">6h</button>
+          <button class="seg__btn" data-hours="12">12h</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- EPG 主体 -->
+    <div class="epg" id="epg">
+      <div class="epg__head">
+        <div class="epg__hours" id="epgHours"></div>
+      </div>
+      <div class="epg__body" id="epgBody">
+        <div class="epg__loading">连接中…</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 视图：Programs -->
+  <section class="view view--programs" data-view="programs">
+    <div class="view__header">
+      <h1 class="view__title"><em>Programs</em> library</h1>
+      <p class="view__sub" id="programsSub">—</p>
+    </div>
+    <div class="program-grid" id="programGrid">
+      <div class="program-grid__loading">加载中…</div>
+    </div>
+  </section>
+
+  <!-- 视图：Sources -->
+  <section class="view view--sources" data-view="sources">
+    <div class="view__header">
+      <h1 class="view__title"><em>Data</em> sources</h1>
+      <p class="view__sub" id="sourcesSub">—</p>
+    </div>
+    <div class="source-list" id="sourceList">
+      <div class="program-grid__loading">加载中…</div>
+    </div>
+  </section>
+
+  <!-- 视图：Jobs -->
+  <section class="view view--jobs" data-view="jobs">
+    <div class="view__header">
+      <h1 class="view__title"><em>Crawl</em> jobs</h1>
+      <p class="view__sub" id="jobsSub">—</p>
+    </div>
+    <div class="job-table" id="jobTable">
+      <div class="program-grid__loading">加载中…</div>
+    </div>
+  </section>
+
+  <!-- 视图：Top Channels -->
+  <section class="view view--channels" data-view="channels">
+    <div class="view__header">
+      <h1 class="view__title"><em>Top</em> channels</h1>
+      <p class="view__sub" id="channelsSub">—</p>
+    </div>
+    <ol class="rank-list" id="rankList">
+      <li class="program-grid__loading">加载中…</li>
+    </ol>
+  </section>
+
+</main>
+
+<!-- 右下：实时 tick -->
+<aside class="now-ticker" aria-hidden="true">
+  <div class="now-ticker__label">SYSTEM TIME</div>
+  <div class="now-ticker__time" id="nowTime">--:--:--</div>
+  <div class="now-ticker__date" id="nowDate">—</div>
+</aside>
+
+<!-- Toast -->
+<div class="toast-host" id="toastHost" aria-live="polite"></div>
+
+<script src="/static/app.js"></script>
+</body>
+</html>
