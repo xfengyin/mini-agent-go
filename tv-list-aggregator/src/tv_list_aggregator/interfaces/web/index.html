@@ -3,188 +3,209 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>TVLIST — Program Aggregator</title>
+<title>TVLIST — IDE</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..900;1,9..144,300..900&family=Instrument+Serif:ital@0;1&family=JetBrains+Mono:ital,wght@0,100..800;1,100..800&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
 
-<!-- 背景装饰：暗色玻璃质感 + 噪点 -->
-<div class="bg-grain" aria-hidden="true"></div>
-<div class="bg-glow" aria-hidden="true"></div>
-
-<!-- 顶部状态条 -->
-<header class="topbar">
-  <div class="brand">
-    <div class="brand-mark">
-      <span class="dot dot--live"></span>
+<!-- ============== 顶栏 ============== -->
+<header class="topbar" id="topbar">
+  <div class="topbar-left">
+    <div class="brand">
+      <span class="brand-mark">▦</span>
+      <span class="brand-name">TVLIST</span>
+      <span class="brand-tag">ide</span>
     </div>
-    <div class="brand-name">
-      <span class="brand-name__main">TVLIST</span>
-      <span class="brand-name__sub">program&nbsp;aggregator</span>
-    </div>
-  </div>
-
-  <div class="search">
-    <span class="search__icon">⌕</span>
-    <input id="searchInput" class="search__input" type="text"
-           placeholder="搜索频道 / 节目 / 源…" autocomplete="off">
-    <kbd class="search__kbd">/</kbd>
-  </div>
-
-  <div class="topbar-actions">
-    <div class="metric-pill" data-tooltip="健康度">
-      <span class="metric-pill__label">health</span>
-      <span class="metric-pill__value" id="healthPct">—</span>
-    </div>
-    <div class="metric-pill" data-tooltip="节目总数">
-      <span class="metric-pill__label">programs</span>
-      <span class="metric-pill__value" id="programsCount">—</span>
-    </div>
-    <div class="metric-pill" data-tooltip="源数量">
-      <span class="metric-pill__label">sources</span>
-      <span class="metric-pill__value" id="sourcesCount">—</span>
-    </div>
-    <button class="btn btn--ghost" id="refreshBtn" title="刷新">
-      <span class="btn__icon">↻</span>
+    <button class="cmd-palette" id="cmdPalette" title="命令面板 (Ctrl+K)">
+      <span class="cmd-palette__icon">⌘K</span>
+      <span class="cmd-palette__placeholder">搜索命令、文件、节目…</span>
     </button>
-    <button class="btn btn--primary" id="triggerCrawlBtn" title="立即抓取">
-      <span class="btn__icon">▶</span>
-      <span>crawl</span>
-    </button>
+  </div>
+  <div class="topbar-right">
+    <span class="env-pill" id="envPill">dev</span>
+    <div class="account-menu" id="accountMenu">
+      <button class="account-btn" id="accountBtn">
+        <span class="account-dot"></span>
+        <span class="account-name" id="accountName">未登录</span>
+        <span class="account-caret">▾</span>
+      </button>
+      <div class="account-dropdown" id="accountDropdown" hidden>
+        <div class="account-info" id="accountInfo">
+          <div class="account-info__row"><span>用户</span><b id="accountInfoUser">—</b></div>
+          <div class="account-info__row"><span>角色</span><b id="accountInfoRole">—</b></div>
+          <div class="account-info__row"><span>Token</span><b id="accountInfoToken">—</b></div>
+        </div>
+        <button class="account-action" id="accountAction">退出登录</button>
+      </div>
+    </div>
   </div>
 </header>
 
-<!-- 左侧导航 -->
-<nav class="sidebar" aria-label="主导航">
-  <ul class="nav">
-    <li class="nav__item is-active" data-view="timeline">
-      <span class="nav__icon">▦</span>
-      <span class="nav__label">Timeline</span>
-      <span class="nav__hint">EPG</span>
-    </li>
-    <li class="nav__item" data-view="programs">
-      <span class="nav__icon">▶</span>
-      <span class="nav__label">Programs</span>
-      <span class="nav__hint" id="programsHint">—</span>
-    </li>
-    <li class="nav__item" data-view="sources">
-      <span class="nav__icon">⌬</span>
-      <span class="nav__label">Sources</span>
-      <span class="nav__hint" id="sourcesHint">—</span>
-    </li>
-    <li class="nav__item" data-view="jobs">
-      <span class="nav__icon">⚙</span>
-      <span class="nav__label">Jobs</span>
-      <span class="nav__hint" id="jobsHint">—</span>
-    </li>
-    <li class="nav__item" data-view="channels">
-      <span class="nav__icon">◉</span>
-      <span class="nav__label">Top Channels</span>
-      <span class="nav__hint">rank</span>
-    </li>
-  </ul>
-
-  <div class="sidebar__foot">
-    <div class="legend">
-      <div class="legend__row"><span class="legend__dot legend__dot--live"></span> LIVE</div>
-      <div class="legend__row"><span class="legend__dot legend__dot--ok"></span> ok</div>
-      <div class="legend__row"><span class="legend__dot legend__dot--warn"></span> warn</div>
-      <div class="legend__row"><span class="legend__dot legend__dot--err"></span> error</div>
-    </div>
-    <div class="ts" id="lastUpdated">—</div>
-  </div>
-</nav>
-
-<!-- 主内容 -->
-<main class="main">
-
-  <!-- 视图：Timeline (EPG) -->
-  <section class="view view--timeline is-active" data-view="timeline">
-    <div class="view__header">
-      <div>
-        <h1 class="view__title">
-          <em>Now</em> on air
-        </h1>
-        <p class="view__sub" id="timelineSub">—</p>
-      </div>
-      <div class="view__controls">
-        <div class="seg">
-          <button class="seg__btn is-active" data-hours="3">3h</button>
-          <button class="seg__btn" data-hours="6">6h</button>
-          <button class="seg__btn" data-hours="12">12h</button>
-        </div>
-      </div>
-    </div>
-
-    <!-- EPG 主体 -->
-    <div class="epg" id="epg">
-      <div class="epg__head">
-        <div class="epg__hours" id="epgHours"></div>
-      </div>
-      <div class="epg__body" id="epgBody">
-        <div class="epg__loading">连接中…</div>
-      </div>
-    </div>
-  </section>
-
-  <!-- 视图：Programs -->
-  <section class="view view--programs" data-view="programs">
-    <div class="view__header">
-      <h1 class="view__title"><em>Programs</em> library</h1>
-      <p class="view__sub" id="programsSub">—</p>
-    </div>
-    <div class="program-grid" id="programGrid">
-      <div class="program-grid__loading">加载中…</div>
-    </div>
-  </section>
-
-  <!-- 视图：Sources -->
-  <section class="view view--sources" data-view="sources">
-    <div class="view__header">
-      <h1 class="view__title"><em>Data</em> sources</h1>
-      <p class="view__sub" id="sourcesSub">—</p>
-    </div>
-    <div class="source-list" id="sourceList">
-      <div class="program-grid__loading">加载中…</div>
-    </div>
-  </section>
-
-  <!-- 视图：Jobs -->
-  <section class="view view--jobs" data-view="jobs">
-    <div class="view__header">
-      <h1 class="view__title"><em>Crawl</em> jobs</h1>
-      <p class="view__sub" id="jobsSub">—</p>
-    </div>
-    <div class="job-table" id="jobTable">
-      <div class="program-grid__loading">加载中…</div>
-    </div>
-  </section>
-
-  <!-- 视图：Top Channels -->
-  <section class="view view--channels" data-view="channels">
-    <div class="view__header">
-      <h1 class="view__title"><em>Top</em> channels</h1>
-      <p class="view__sub" id="channelsSub">—</p>
-    </div>
-    <ol class="rank-list" id="rankList">
-      <li class="program-grid__loading">加载中…</li>
-    </ol>
-  </section>
-
-</main>
-
-<!-- 右下：实时 tick -->
-<aside class="now-ticker" aria-hidden="true">
-  <div class="now-ticker__label">SYSTEM TIME</div>
-  <div class="now-ticker__time" id="nowTime">--:--:--</div>
-  <div class="now-ticker__date" id="nowDate">—</div>
+<!-- ============== 活动栏（左侧图标列） ============== -->
+<aside class="activity-bar" id="activityBar">
+  <button class="activity-btn is-active" data-activity="sources" title="Sources">
+    <span class="activity-icon">ⓘ</span>
+  </button>
+  <button class="activity-btn" data-activity="channels" title="Channels">
+    <span class="activity-icon">⊞</span>
+  </button>
+  <button class="activity-btn" data-activity="jobs" title="Jobs">
+    <span class="activity-icon">▤</span>
+  </button>
+  <button class="activity-btn" data-activity="programs" title="Programs">
+    <span class="activity-icon">▦</span>
+  </button>
+  <button class="activity-btn" data-activity="plugins" title="Plugins">
+    <span class="activity-icon">⚙</span>
+  </button>
+  <div class="activity-spacer"></div>
+  <button class="activity-btn" data-activity="crawl" title="立即抓取" id="crawlBtn">
+    <span class="activity-icon">▶</span>
+  </button>
 </aside>
 
-<!-- Toast -->
+<!-- ============== 资源树（活动栏右侧面板） ============== -->
+<aside class="explorer" id="explorer">
+  <div class="explorer-header">
+    <span class="explorer-title" id="explorerTitle">EXPLORER</span>
+    <button class="explorer-refresh" id="explorerRefresh" title="刷新">↻</button>
+  </div>
+  <div class="explorer-search">
+    <input id="explorerSearch" type="text" placeholder="过滤…" autocomplete="off">
+  </div>
+  <div class="explorer-body" id="explorerBody">
+    <!-- 动态渲染：每个根节点一组 -->
+    <div class="tree-root" data-root="sources">
+      <div class="tree-root__head">
+        <span class="tree-caret">▾</span>
+        <span class="tree-root__label">SOURCES</span>
+        <span class="tree-root__count" id="cnt-sources">0</span>
+      </div>
+      <ul class="tree-children" id="tree-sources"></ul>
+    </div>
+    <div class="tree-root" data-root="channels">
+      <div class="tree-root__head">
+        <span class="tree-caret">▾</span>
+        <span class="tree-root__label">CHANNELS</span>
+        <span class="tree-root__count" id="cnt-channels">0</span>
+      </div>
+      <ul class="tree-children" id="tree-channels"></ul>
+    </div>
+    <div class="tree-root" data-root="jobs">
+      <div class="tree-root__head">
+        <span class="tree-caret">▾</span>
+        <span class="tree-root__label">JOBS</span>
+        <span class="tree-root__count" id="cnt-jobs">0</span>
+      </div>
+      <ul class="tree-children" id="tree-jobs"></ul>
+    </div>
+    <div class="tree-root" data-root="programs">
+      <div class="tree-root__head">
+        <span class="tree-caret">▾</span>
+        <span class="tree-root__label">PROGRAMS</span>
+        <span class="tree-root__count" id="cnt-programs">0</span>
+      </div>
+      <ul class="tree-children" id="tree-programs"></ul>
+    </div>
+    <div class="tree-root" data-root="plugins">
+      <div class="tree-root__head">
+        <span class="tree-caret">▾</span>
+        <span class="tree-root__label">PLUGINS</span>
+        <span class="tree-root__count" id="cnt-plugins">0</span>
+      </div>
+      <ul class="tree-children" id="tree-plugins"></ul>
+    </div>
+  </div>
+</aside>
+
+<!-- ============== 主区：tab + 内容 ============== -->
+<main class="editor" id="editor">
+  <div class="tab-bar" id="tabBar">
+    <!-- 动态 tab -->
+  </div>
+  <div class="tab-content" id="tabContent">
+    <div class="welcome">
+      <div class="welcome__brand">▦ TVLIST IDE</div>
+      <h1 class="welcome__title">资源浏览器</h1>
+      <p class="welcome__sub">从左侧选择资源类型开始浏览，或使用 <kbd>⌘K</kbd> 命令面板</p>
+      <div class="welcome__shortcuts">
+        <div class="shortcut"><kbd>ⓘ</kbd> 数据源</div>
+        <div class="shortcut"><kbd>⊞</kbd> 频道</div>
+        <div class="shortcut"><kbd>▤</kbd> 任务</div>
+        <div class="shortcut"><kbd>▦</kbd> 节目</div>
+        <div class="shortcut"><kbd>▶</kbd> 立即抓取</div>
+        <div class="shortcut"><kbd>Ctrl+S</kbd> 保存编辑</div>
+        <div class="shortcut"><kbd>/</kbd> 搜索过滤</div>
+      </div>
+    </div>
+  </div>
+</main>
+
+<!-- ============== 右侧二级面板 ============== -->
+<aside class="panel-right" id="panelRight">
+  <div class="panel-tabs" id="panelTabs">
+    <!-- 动态二级 tab -->
+  </div>
+  <div class="panel-content" id="panelContent">
+    <div class="panel-empty">选中资源以查看详情</div>
+  </div>
+</aside>
+
+<!-- ============== 状态栏 ============== -->
+<footer class="statusbar" id="statusbar">
+  <div class="statusbar-left">
+    <span class="status-segment" id="statusEnv">ⓘ dev</span>
+    <span class="status-segment" id="statusDb">◉ 0 programs</span>
+    <span class="status-segment" id="statusToken">🔒 unauth</span>
+  </div>
+  <div class="statusbar-mid">
+    <span class="status-segment" id="statusPath">—</span>
+  </div>
+  <div class="statusbar-right">
+    <span class="status-segment" id="statusClock">--:--:--</span>
+    <span class="status-segment" id="statusSynced">sync —</span>
+  </div>
+</footer>
+
+<!-- ============== 登录面板（覆盖层） ============== -->
+<div class="login-overlay" id="loginOverlay" hidden>
+  <div class="login-modal">
+    <div class="login-modal__head">
+      <span class="brand-mark">▦</span>
+      <h2>登录 TVLIST</h2>
+    </div>
+    <form class="login-form" id="loginForm">
+      <label class="login-field">
+        <span>用户名</span>
+        <input type="text" id="loginUser" name="username" autocomplete="username" required>
+      </label>
+      <label class="login-field">
+        <span>密码</span>
+        <input type="password" id="loginPass" name="password" autocomplete="current-password" required>
+      </label>
+      <div class="login-error" id="loginError" hidden></div>
+      <button type="submit" class="login-submit" id="loginSubmit">登录</button>
+    </form>
+    <div class="login-hint">dev 默认账号：<code>admin / admin123</code>，<code>user / user123</code></div>
+  </div>
+</div>
+
+<!-- ============== Toast ============== -->
 <div class="toast-host" id="toastHost" aria-live="polite"></div>
+
+<!-- ============== 右键菜单 ============== -->
+<div class="context-menu" id="contextMenu" hidden>
+  <ul>
+    <li data-action="open">在主区打开</li>
+    <li data-action="crawl">立即抓取</li>
+    <li data-action="enable">启用</li>
+    <li data-action="disable">禁用</li>
+    <li data-action="delete" class="ctx-danger">删除</li>
+  </ul>
+</div>
 
 <script src="/static/app.js"></script>
 </body>
