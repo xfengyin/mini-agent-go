@@ -49,10 +49,22 @@ from ...plugins.sources.html_scrape_source import HTMLScrapeSource
 from ...plugins.sources.http_json_source import HTTPSource
 from ...plugins.sources.m3u_source import M3USource
 from ...plugins.sources.rss_source import RSSSource
+from .middleware.access_log import AccessLogMiddleware
 from .middleware.error_handler import ErrorHandlerMiddleware
 from .middleware.rate_limit import limiter
 from .middleware.request_id import RequestIDMiddleware
-from .routers import admin, auth, channels, dashboard, export, health, jobs, programs, sources
+from .routers import (
+    admin,
+    auth,
+    channels,
+    dashboard,
+    export,
+    health,
+    jobs,
+    metrics,
+    programs,
+    sources,
+)
 
 log = get_logger(__name__)
 
@@ -232,9 +244,27 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     yield
 
     log.info("app.shutdown")
-    scheduler.shutdown()
-    await fetcher.aclose()
-    await engine.dispose()
+    # 优雅关闭：先等待 5s 让 in-flight 请求完成，再关闭 scheduler 与 DB 引擎
+    try:
+        await asyncio.sleep(5)
+    except Exception as e:  # noqa: BLE001
+        log.warning("app.shutdown.sleep_failed", error=str(e))
+    # 关闭 scheduler
+    try:
+        scheduler.shutdown()
+    except Exception as e:  # noqa: BLE001
+        log.warning("app.shutdown.scheduler_failed", error=str(e))
+    # 关闭 fetcher
+    try:
+        await fetcher.aclose()
+    except Exception as e:  # noqa: BLE001
+        log.warning("app.shutdown.fetcher_failed", error=str(e))
+    # 关闭 session_factory 持有的 engine
+    try:
+        await engine.dispose()
+    except Exception as e:  # noqa: BLE001
+        log.warning("app.shutdown.engine_failed", error=str(e))
+    log.info("app.shutdown_done")
 
 
 def create_app() -> FastAPI:
@@ -292,8 +322,10 @@ def create_app() -> FastAPI:
     app.add_exception_handler(RequestValidationError, _validation_handler)
     app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)  # type: ignore[arg-type]
     app.add_middleware(RequestIDMiddleware)
+    app.add_middleware(AccessLogMiddleware)
     app.add_middleware(ErrorHandlerMiddleware)
     app.include_router(health.router)
+    app.include_router(metrics.router)
     app.include_router(auth.router, prefix="/api/v1")
     app.include_router(sources.router, prefix="/api/v1")
     app.include_router(programs.router, prefix="/api/v1")
