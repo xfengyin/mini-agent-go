@@ -5,7 +5,9 @@ import asyncio
 import os
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 
@@ -124,6 +126,22 @@ async def lifespan(app: FastAPI):
     engine = make_engine(s.database_url)
     session_factory = make_session_factory(engine)
 
+    # 启动期自动建表（修复内存 SQLite / 首次启动无 alembic 的场景）：
+    # - 生产 (app_env in {production, staging})：默认不自动建表，强制走 alembic 迁移
+    # - 非生产 + TV_LIST_BOOTSTRAP_SCHEMA != "0"：自动 Base.metadata.create_all
+    bootstrap = os.environ.get("TV_LIST_BOOTSTRAP_SCHEMA")
+    if bootstrap is None:
+        bootstrap = "0" if s.is_production() else "1"
+    if bootstrap == "1":
+        try:
+            from ...infrastructure.persistence.models import Base
+
+            async with engine.begin() as conn:
+                await conn.run_sync(Base.metadata.create_all)
+            log.info("app.schema_bootstrapped", url=s.database_url.split("@")[-1])
+        except Exception as e:  # noqa: BLE001
+            log.warning("app.schema_bootstrap_failed", error=str(e))
+
     # 插件
     prompts = PromptLoader("src/tv_list_aggregator/infrastructure/llm/prompts")
     router_llm = LLMRouter(primary=StubLLM(), fallbacks=[])
@@ -190,6 +208,41 @@ def create_app() -> FastAPI:
         lifespan=lifespan,
     )
     app.state.limiter = limiter
+
+    async def _http_exception_handler(request: Request, exc: HTTPException) -> JSONResponse:
+        """HTTPException -> RFC 7807 problem+json。"""
+        rid = getattr(request.state, "request_id", None) or "unknown"
+        body = {
+            "type": "/problems/http-error",
+            "title": exc.detail if isinstance(exc.detail, str) else "HTTP Error",
+            "status": exc.status_code,
+            "detail": exc.detail if isinstance(exc.detail, str) else str(exc.detail),
+            "instance": str(request.url.path),
+            "request_id": rid,
+        }
+        headers = dict(exc.headers or {})
+        headers.setdefault("x-request-id", rid)
+        return JSONResponse(body, status_code=exc.status_code, headers=headers)
+
+    async def _validation_handler(request: Request, exc: RequestValidationError) -> JSONResponse:
+        """RequestValidationError -> RFC 7807 problem+json。"""
+        rid = getattr(request.state, "request_id", None) or "unknown"
+        return JSONResponse(
+            {
+                "type": "/problems/validation-error",
+                "title": "Validation Error",
+                "status": 422,
+                "detail": "request validation failed",
+                "instance": str(request.url.path),
+                "request_id": rid,
+                "errors": exc.errors(),
+            },
+            status_code=422,
+            headers={"x-request-id": rid},
+        )
+
+    app.add_exception_handler(HTTPException, _http_exception_handler)
+    app.add_exception_handler(RequestValidationError, _validation_handler)
     app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
     app.add_middleware(RequestIDMiddleware)
     app.add_middleware(ErrorHandlerMiddleware)
