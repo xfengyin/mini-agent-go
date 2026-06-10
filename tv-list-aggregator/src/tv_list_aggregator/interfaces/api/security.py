@@ -32,6 +32,22 @@ def create_access_token(sub: str, role: str = ROLE_USER, ttl_min: int | None = N
     return encoded
 
 
+def decode_token(token: str) -> dict[str, Any] | None:
+    """解码并校验 JWT。
+
+    返回 payload（dict）表示 token 有效且未过期；
+    任何 JWTError（签名错误、过期、格式非法）都返回 None，
+    避免上层依赖耦合到 jose 异常类型。
+    """
+    s = get_settings()
+    try:
+        return jwt.decode(  # type: ignore[return-value]
+            token, s.secret_key.get_secret_value(), algorithms=[s.jwt_algorithm]
+        )
+    except JWTError:
+        return None
+
+
 def require_role(required: str):
     """依赖注入：要求 JWT 中具有指定角色（admin 始终通过）。"""
 

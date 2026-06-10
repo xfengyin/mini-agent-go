@@ -79,6 +79,42 @@ class ErrorHandlerMiddleware(BaseHTTPMiddleware):
                 type_uri="/problems/domain-error",
                 extra={"error": type(e).__name__},
             )
+        # 内置异常 -> 标准 HTTP 状态码：避免 500 暴露实现细节，
+        # 同时让客户端能用语义化状态码做统一处理。
+        # 必须放在 TVListBaseError 之后，否则子类会被基类分支抢走。
+        except ValueError as e:
+            log.warning("api.value_error", error=str(e), path=request.url.path)
+            return _problem(
+                request=request,
+                status_code=400,
+                title="Bad Request",
+                detail=str(e) or "invalid value",
+                type_uri="/problems/value-error",
+                extra={"error": type(e).__name__},
+            )
+        except PermissionError as e:
+            log.warning("api.permission_error", error=str(e), path=request.url.path)
+            return _problem(
+                request=request,
+                status_code=403,
+                title="Forbidden",
+                detail=str(e) or "permission denied",
+                type_uri="/problems/permission-error",
+                extra={"error": type(e).__name__},
+            )
+        except KeyError as e:
+            # KeyError 默认 repr 带引号（"'foo'"），仅取 key 字符串
+            key_name = e.args[0] if e.args else ""
+            detail = f"key not found: {key_name}" if key_name else "key not found"
+            log.warning("api.key_error", error=detail, path=request.url.path)
+            return _problem(
+                request=request,
+                status_code=404,
+                title="Not Found",
+                detail=detail,
+                type_uri="/problems/key-error",
+                extra={"error": type(e).__name__},
+            )
         except Exception as e:  # noqa: BLE001
             log.error(
                 "api.unhandled_error",

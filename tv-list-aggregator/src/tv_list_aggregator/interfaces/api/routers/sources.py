@@ -5,7 +5,7 @@ import uuid
 from datetime import UTC, datetime
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ....domain.models.source import SourceStatus, TVListSource
@@ -13,6 +13,7 @@ from ....infrastructure.persistence.source_repository_impl import (
     SQLAlchemySourceRepository,
 )
 from ..deps import get_session, get_source_repo
+from ..middleware.rate_limit import limiter
 from ..schemas.source import SourceCreate, SourceOut, SourceUpdate
 from ..security import ROLE_ADMIN, require_role
 
@@ -25,7 +26,9 @@ router = APIRouter(prefix="/sources", tags=["sources"])
     status_code=status.HTTP_201_CREATED,
     dependencies=[Depends(require_role(ROLE_ADMIN))],
 )
+@limiter.limit("20/minute")
 async def create_source(
+    request: Request,
     payload: SourceCreate,
     repo: SQLAlchemySourceRepository = Depends(get_source_repo),
     session: AsyncSession = Depends(get_session),
@@ -68,7 +71,9 @@ async def get_source(
     status_code=status.HTTP_204_NO_CONTENT,
     dependencies=[Depends(require_role(ROLE_ADMIN))],
 )
+@limiter.limit("20/minute")
 async def delete_source(
+    request: Request,
     source_id: str,
     repo: SQLAlchemySourceRepository = Depends(get_source_repo),
     session: AsyncSession = Depends(get_session),
@@ -82,7 +87,9 @@ async def delete_source(
     "/{source_id}/enable",
     dependencies=[Depends(require_role(ROLE_ADMIN))],
 )
+@limiter.limit("20/minute")
 async def enable_source(
+    request: Request,
     source_id: str,
     repo: SQLAlchemySourceRepository = Depends(get_source_repo),
     session: AsyncSession = Depends(get_session),
@@ -100,7 +107,9 @@ async def enable_source(
     "/{source_id}/disable",
     dependencies=[Depends(require_role(ROLE_ADMIN))],
 )
+@limiter.limit("20/minute")
 async def disable_source(
+    request: Request,
     source_id: str,
     repo: SQLAlchemySourceRepository = Depends(get_source_repo),
     session: AsyncSession = Depends(get_session),
@@ -119,7 +128,9 @@ async def disable_source(
     response_model=SourceOut,
     dependencies=[Depends(require_role(ROLE_ADMIN))],
 )
+@limiter.limit("20/minute")
 async def update_source(
+    request: Request,
     source_id: str,
     payload: SourceUpdate,
     repo: SQLAlchemySourceRepository = Depends(get_source_repo),
