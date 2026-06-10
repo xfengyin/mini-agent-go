@@ -5,6 +5,17 @@
 
 ---
 
+## Recent Improvements (2026-06-10)
+- 测试覆盖 74 passed (0 mypy errors, 0 ruff errors)
+- 新增 Prometheus 指标端点 /metrics
+- 新增访问日志中间件 + 慢请求告警 (>500ms)
+- 新增 JWT 刷新端点 /api/v1/auth/refresh
+- 限流加固（写端点 20/minute）
+- dashboard /summary 30s TTL 缓存
+- 优雅关闭（5s drain）
+
+---
+
 ## 项目简介
 
 **TV List Aggregator** 是一个**生产可用的多源电视节目表聚合 AI Agent**，通过 SPI 插件化架构接入多种数据源（HTTP JSON / RSS / HTML 抓取 / M3U），借助 LLM 智能兜底解析，实现频道、节目单、时段的标准化、去重与持久化，并通过 REST API 对外提供能力。
