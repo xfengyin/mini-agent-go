@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ....domain.models.source import SourceStatus, TVListSource
 from ..deps import get_session, get_source_repo
-from ..schemas.source import SourceCreate, SourceOut
+from ..schemas.source import SourceCreate, SourceOut, SourceUpdate
 from ..security import ROLE_ADMIN, require_role
 
 router = APIRouter(prefix="/sources", tags=["sources"])
@@ -108,3 +108,32 @@ async def disable_source(
     await repo.update(s)
     await session.commit()
     return {"ok": True}
+
+
+@router.put(
+    "/{source_id}",
+    response_model=SourceOut,
+    dependencies=[Depends(require_role(ROLE_ADMIN))],
+)
+async def update_source(
+    source_id: str,
+    payload: SourceUpdate,
+    repo=Depends(get_source_repo),
+    session: AsyncSession = Depends(get_session),
+):
+    """更新源配置（部分字段）。需 admin 权限。
+
+    只更新 payload 中显式提供的字段（exclude_unset 语义），
+    其余字段保持原值不变。
+    """
+    s = await repo.get(source_id)
+    if not s:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "source not found")
+    data = payload.model_dump(exclude_unset=True)
+    for k, v in data.items():
+        if hasattr(s, k):
+            setattr(s, k, v)
+    s.updated_at = datetime.now(tz=UTC)
+    await repo.update(s)
+    await session.commit()
+    return s
