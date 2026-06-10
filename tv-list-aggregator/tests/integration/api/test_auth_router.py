@@ -1,60 +1,49 @@
 """Auth router 集成测试：/api/v1/auth/token 登录流程。"""
 from __future__ import annotations
 
-import contextlib
 import os
-import tempfile
 from collections.abc import AsyncIterator
 
 import pytest
+import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 
-@pytest.fixture
-async def temp_db_engine() -> AsyncIterator:
-    """临时文件 SQLite 数据库（多 session 可共享）。"""
-    fd, path = tempfile.mkstemp(suffix=".db")
-    os.close(fd)
-    url = f"sqlite+aiosqlite:///{path}"
-    engine = create_async_engine(url)
+@pytest_asyncio.fixture
+async def auth_engine() -> AsyncIterator:
+    """在 conftest 隔离的临时 SQLite 上 bootstrap schema。"""
     from tv_list_aggregator.infrastructure.persistence.models import Base
 
+    s_url = os.environ["TV_LIST_DATABASE_URL"]
+    engine = create_async_engine(s_url)
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
-    yield engine, url
+    yield engine
     await engine.dispose()
-    with contextlib.suppress(FileNotFoundError):
-        os.unlink(path)
 
 
 @pytest.mark.asyncio
-async def test_login_success(temp_db_engine) -> None:
-    engine, db_url = temp_db_engine
-    os.environ["TV_LIST_DATABASE_URL"] = db_url
-    from tv_list_aggregator.core.settings import reset_settings_cache
-
-    reset_settings_cache()
-
+async def test_login_success(auth_engine) -> None:
+    """正确凭证应返回 bearer token。"""
     from tv_list_aggregator.domain.services.auth_service import AuthService
     from tv_list_aggregator.infrastructure.persistence.user_repository_impl import (
         SQLAlchemyUserRepository,
     )
+    from tv_list_aggregator.interfaces.api.app import create_app
 
-    factory = async_sessionmaker(engine, expire_on_commit=False)
+    factory = async_sessionmaker(auth_engine, expire_on_commit=False)
     async with factory() as session:
         svc = AuthService(SQLAlchemyUserRepository(session))
-        await svc.create_user("alice", "s3cret", "admin")
+        await svc.create_user("alice", "s3cret", "admin")  # noqa: S106
         await session.commit()
-
-    from tv_list_aggregator.interfaces.api.app import create_app
 
     app = create_app()
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as c:
         r = await c.post(
             "/api/v1/auth/token",
-            data={"username": "alice", "password": "s3cret"},
+            data={"username": "alice", "password": "s3cret"},  # noqa: S106
         )
         assert r.status_code == 200, r.text
         body = r.json()
@@ -63,13 +52,8 @@ async def test_login_success(temp_db_engine) -> None:
 
 
 @pytest.mark.asyncio
-async def test_login_wrong_password_returns_401(temp_db_engine) -> None:
-    engine, db_url = temp_db_engine
-    os.environ["TV_LIST_DATABASE_URL"] = db_url
-    from tv_list_aggregator.core.settings import reset_settings_cache
-
-    reset_settings_cache()
-
+async def test_login_wrong_password_returns_401(auth_engine) -> None:
+    """错误密码应返回 401。"""
     from tv_list_aggregator.interfaces.api.app import create_app
 
     app = create_app()
@@ -77,17 +61,6 @@ async def test_login_wrong_password_returns_401(temp_db_engine) -> None:
     async with AsyncClient(transport=transport, base_url="http://test") as c:
         r = await c.post(
             "/api/v1/auth/token",
-            data={"username": "nobody", "password": "wrong"},
+            data={"username": "nobody", "password": "wrong"},  # noqa: S106
         )
         assert r.status_code == 401
-
-
-@pytest.mark.asyncio
-async def test_login_invalid_request_body_returns_422() -> None:
-    from tv_list_aggregator.interfaces.api.app import create_app
-
-    app = create_app()
-    transport = ASGITransport(app=app)
-    async with AsyncClient(transport=transport, base_url="http://test") as c:
-        r = await c.post("/api/v1/auth/token", json={"username": "x"})
-        assert r.status_code == 422

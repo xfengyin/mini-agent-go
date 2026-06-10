@@ -9,7 +9,7 @@ from ....infrastructure.persistence.source_repository_impl import (
     SQLAlchemySourceRepository,
 )
 from ....plugins.registry import PluginRegistry
-from ..deps import get_session
+from ..deps import get_session, get_source_repo
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
@@ -29,12 +29,12 @@ async def list_plugins(request: Request) -> dict:
 async def trigger_crawl(
     source_id: str,
     request: Request,
+    repo: SQLAlchemySourceRepository = Depends(get_source_repo),
     session: AsyncSession = Depends(get_session),
 ) -> dict:
     agg = getattr(request.app.state, "agg", None)
     if agg is None:
         raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, "aggregator not initialized")
-    repo = SQLAlchemySourceRepository(session)
     src = await repo.get(source_id)
     if not src:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "source not found")
@@ -46,13 +46,13 @@ async def trigger_crawl(
 @router.post("/crawl-all")
 async def trigger_crawl_all(
     request: Request,
+    repo: SQLAlchemySourceRepository = Depends(get_source_repo),
     session: AsyncSession = Depends(get_session),
 ) -> dict:
     """触发所有 active 源的抓取。返回每个源对应的 job_id 或 error。"""
     agg = getattr(request.app.state, "agg", None)
     if agg is None:
         raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, "aggregator not initialized")
-    repo = SQLAlchemySourceRepository(session)
     sources = await repo.list(status="active")
     results: list[dict] = []
     for src in sources:

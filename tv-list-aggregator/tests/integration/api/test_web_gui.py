@@ -45,13 +45,21 @@ def test_root_serves_index_html(temp_db_file: str) -> None:
         assert r.status_code == 200
         assert r.headers["content-type"].startswith("text/html")
         assert "<title>TVLIST" in r.text
-        # 关键 DOM 节点必须存在
+        # 关键 DOM 节点必须存在（Cursor 风格 IDE 骨架）
         for marker in (
-            'id="epgBody"',
-            'id="programGrid"',
-            'id="sourceList"',
-            'id="jobTable"',
-            'id="rankList"',
+            'id="topbar"',          # 顶栏（品牌 + 命令面板 + 账户菜单）
+            'id="activityBar"',     # 活动栏（5 个 activity-btn + crawl 按钮）
+            'id="explorer"',        # 资源树容器
+            'id="tree-sources"',    # 资源树 - Sources 根节点
+            'id="tree-channels"',   # 资源树 - Channels 根节点
+            'id="tree-jobs"',       # 资源树 - Jobs 根节点
+            'id="tree-programs"',   # 资源树 - Programs 根节点
+            'id="editor"',          # 主编辑区
+            'id="tabBar"',          # 多 tab 栏
+            'id="tabContent"',      # tab 内容区
+            'id="panelRight"',      # 右侧二级面板
+            'id="statusbar"',       # 状态栏
+            'id="loginOverlay"',    # 登录覆盖层
             "/static/style.css",
             "/static/app.js",
         ):
@@ -64,12 +72,18 @@ def test_static_files_are_served(temp_db_file: str) -> None:
         r = c.get("/static/style.css")
         assert r.status_code == 200
         assert r.headers["content-type"].startswith("text/css")
-        assert "fraunces" in r.text.lower() or "JetBrains" in r.text
+        # 字体：Inter（sans）+ JetBrains Mono（mono）
+        assert "Inter" in r.text or "JetBrains" in r.text
 
         r = c.get("/static/app.js")
         assert r.status_code == 200
         assert r.headers["content-type"].startswith(("application/javascript", "text/javascript"))
-        assert "switchView" in r.text
+        # 关键函数 / 全局对象必须存在
+        assert "switchTab" in r.text
+        assert "openTab" in r.text
+        assert "loadExplorer" in r.text
+        assert "renderTab" in r.text
+        assert "toast" in r.text  # 通知函数（toast / showToast）
 
 
 def test_dashboard_summary_endpoint(temp_db_file: str) -> None:

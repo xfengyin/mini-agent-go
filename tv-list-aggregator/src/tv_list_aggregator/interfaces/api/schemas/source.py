@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Optional
 
 from pydantic import BaseModel, ConfigDict, Field, HttpUrl
 
@@ -23,14 +22,14 @@ class SourceCreate(BaseModel):
 
 class SourceUpdate(BaseModel):
     """PUT /sources/{id} 的请求体，所有字段可选，支持部分更新。"""
-    name: Optional[str] = None
-    type: Optional[SourceType] = None
-    url: Optional[str] = None
-    config: Optional[dict] = None
-    headers: Optional[dict[str, str]] = None
-    cron: Optional[str] = None
-    priority: Optional[int] = None
-    parser: Optional[str] = None
+    name: str | None = None
+    type: SourceType | None = None
+    url: str | None = None
+    config: dict | None = None
+    headers: dict[str, str] | None = None
+    cron: str | None = None
+    priority: int | None = None
+    parser: str | None = None
 
 
 class SourceOut(BaseModel):

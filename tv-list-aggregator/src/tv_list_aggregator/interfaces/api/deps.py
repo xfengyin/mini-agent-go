@@ -56,13 +56,36 @@ async def get_session(request: Request) -> AsyncIterator[AsyncSession]:
         yield session
 
 
-async def get_source_repo(session: AsyncSession = Depends(get_session)):
+async def get_source_repo(
+    request: Request,
+    session: AsyncSession = Depends(get_session),
+):
+    """优先从 app.state.source_repo 读取（lifespan 注入或测试 mock），
+    否则回退到基于 session 构造（兼容脚本/默认场景）。
+    """
+    injected = getattr(request.app.state, "source_repo", None)
+    if injected is not None:
+        return injected
     return SQLAlchemySourceRepository(session)
 
 
-async def get_program_repo(session: AsyncSession = Depends(get_session)):
+async def get_program_repo(
+    request: Request,
+    session: AsyncSession = Depends(get_session),
+):
+    """优先从 app.state.program_repo 读取，否则回退。"""
+    injected = getattr(request.app.state, "program_repo", None)
+    if injected is not None:
+        return injected
     return SQLAlchemyProgramRepository(session)
 
 
-async def get_job_repo(session: AsyncSession = Depends(get_session)):
+async def get_job_repo(
+    request: Request,
+    session: AsyncSession = Depends(get_session),
+):
+    """优先从 app.state.job_repo 读取，否则回退。"""
+    injected = getattr(request.app.state, "job_repo", None)
+    if injected is not None:
+        return injected
     return SQLAlchemyJobRepository(session)
