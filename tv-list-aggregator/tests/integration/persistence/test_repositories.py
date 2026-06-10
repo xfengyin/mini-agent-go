@@ -18,7 +18,7 @@ async def test_source_crud_lifecycle() -> None:
     engine = create_async_engine("sqlite+aiosqlite:///:memory:")
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
-    Session = async_sessionmaker(engine, expire_on_commit=False)
+    Session = async_sessionmaker(engine, expire_on_commit=False)  # noqa: N806
 
     async with Session() as s:
         repo = SQLAlchemySourceRepository(s)

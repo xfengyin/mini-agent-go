@@ -18,10 +18,10 @@ class PromptLoader:
         with path.open(encoding="utf-8") as f:
             return yaml.safe_load(f) or {}
 
-    def render(self, name: str, **vars: object) -> str:
+    def render(self, name: str, **variables: object) -> str:
         """加载并使用 {{ var }} 占位符渲染。"""
         data = self.load(name)
         template: str = data.get("user_template", "")
-        for k, v in vars.items():
+        for k, v in variables.items():
             template = template.replace("{{ " + k + " }}", str(v))
         return template

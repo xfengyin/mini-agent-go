@@ -1,10 +1,14 @@
 """APScheduler 异步调度器封装。"""
 from __future__ import annotations
 
+import contextlib
+import logging
 from collections.abc import Callable
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
+
+logger = logging.getLogger(__name__)
 
 
 class JobScheduler:
@@ -43,7 +47,6 @@ class JobScheduler:
         )
 
     def remove(self, job_id: str) -> None:
-        try:
+        with contextlib.suppress(Exception):
             self.sched.remove_job(job_id)
-        except Exception:
-            pass
+            logger.debug("scheduler: removed job %s", job_id)

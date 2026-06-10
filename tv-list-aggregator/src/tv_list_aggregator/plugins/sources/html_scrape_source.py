@@ -1,10 +1,14 @@
 """HTML 抓取源适配器（Playwright + 解析器链）。"""
 from __future__ import annotations
 
+import logging
+
 from ...domain.models.program import TVProgram
 from ...domain.models.source import TVListSource
 from ...domain.ports.fetcher import FetchResult
 from ...infrastructure.http.playwright_fetcher import PlaywrightFetcher
+
+logger = logging.getLogger(__name__)
 
 
 class HTMLScrapeSource:
@@ -32,5 +36,6 @@ class HTMLScrapeSource:
                 if programs:
                     return programs
             except Exception:
+                logger.exception("html_scrape_source: parser %s failed", getattr(parser, "type", parser))
                 continue
         return []

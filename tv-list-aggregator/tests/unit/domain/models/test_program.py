@@ -1,7 +1,10 @@
 """Program/Source 实体测试。"""
 from __future__ import annotations
 
+import contextlib
 from datetime import UTC, datetime
+
+from pydantic import ValidationError
 
 from tv_list_aggregator.domain.models.program import TVProgram
 from tv_list_aggregator.domain.models.source import SourceStatus, SourceType
@@ -30,12 +33,8 @@ def test_source_status_enum() -> None:
 
 
 def test_value_objects_are_frozen() -> None:
-    from pydantic import ValidationError
-
     ch = Channel(id="c1", name="C1")
-    try:
+    with contextlib.suppress(ValidationError):
         ch.id = "c2"  # type: ignore[misc]
-    except ValidationError:
-        pass
     # pydantic v2 frozen 模型对赋值行为是 raise
     assert ch.id == "c1"

@@ -65,9 +65,14 @@ ignore = ["E501"]
 [tool.ruff.lint.per-file-ignores]
 "**/*.py" = ["RUF002"]  # 中文括号误报
 "tests/**/*.py" = ["S101", "PT018"]  # 测试中 assert 必需
-"src/tv_list_aggregator/core/settings.py" = ["B008"]  # pydantic Field default_factory
+"src/tv_list_aggregator/core/settings.py" = ["B008", "S105"]  # pydantic Field default_factory, 默认密钥
+"src/tv_list_aggregator/interfaces/api/routers/*.py" = ["B008"]  # FastAPI Depends/Query 模式
+"src/tv_list_aggregator/interfaces/api/deps.py" = ["B008"]  # FastAPI Depends 模式
 "src/tv_list_aggregator/interfaces/api/security.py" = ["S105", "S324"]  # JWT 示例密钥
-"src/tv_list_aggregator/plugins/parsers/base.py" = ["A002"]  # id 是值对象属性名
+"src/tv_list_aggregator/plugins/parsers/base.py" = ["A002", "S324"]  # id 是值对象属性名；identity_key 用 sha1
+"src/tv_list_aggregator/infrastructure/http/playwright_fetcher.py" = ["S101"]  # 实例方法前置断言
+"src/tv_list_aggregator/infrastructure/resilience/circuit_breaker.py" = ["S101", "UP042"]  # 不变式断言；str+Enum
+"src/tv_list_aggregator/domain/models/*.py" = ["UP042"]  # str + Enum 是 pydantic v2 惯用法
 
 [tool.mypy]
 strict = true
